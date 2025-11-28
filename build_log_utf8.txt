@@ -1,0 +1,83 @@
+﻿[36mvite v7.2.4 [32mbuilding client environment for production...[36m[39m
+transforming...
+[32mÔ£ô[39m 3 modules transformed.
+node.exe : 
+[31mÔ£ù[39m Build 
+failed in 311ms
+En línea: 1 Carácter: 
+1
++ & "C:\Program Files\
+nodejs/node.exe" 
+"C:\Program 
+Files\nodejs/node_mo 
+...
++ ~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
+~~~~~
+    + CategoryInfo    
+          : NotSpeci  
+  fied: ([31mÔ£ù[   
+ 39m Build failed     
+in 311ms:String)     
+[], RemoteExcepti    
+on
+    + FullyQualifiedE 
+   rrorId : NativeCo  
+  mmandError
+ 
+[31merror during 
+build:
+[31m[vite:css] 
+[postcss] It looks 
+like you're trying to 
+use `tailwindcss` 
+directly as a PostCSS 
+plugin. The PostCSS 
+plugin has moved to a 
+separate package, so 
+to continue using 
+Tailwind CSS with 
+PostCSS you'll need 
+to install `@tailwindc
+ss/postcss` and 
+update your PostCSS 
+configuration.[31m
+file: [36mW:/TRabajo/
+Bicicolombia/Formulari
+o_Bicicolombia/src/ind
+ex.css:undefined:NaN[
+31m
+    at at (W:\TRabajo\
+Bicicolombia\Formulari
+o_Bicicolombia\node_mo
+dules\tailwindcss\dist
+\lib.js:38:1629)
+    at 
+LazyResult.runOnRoot (
+W:\TRabajo\Bicicolombi
+a\Formulario_Bicicolom
+bia\node_modules\postc
+ss\lib\lazy-result.js:
+361:16)
+    at 
+LazyResult.runAsync (W
+:\TRabajo\Bicicolombia
+\Formulario_Bicicolomb
+ia\node_modules\postcs
+s\lib\lazy-result.js:2
+90:26)
+    at 
+LazyResult.async (W:\T
+Rabajo\Bicicolombia\Fo
+rmulario_Bicicolombia\
+node_modules\postcss\l
+ib\lazy-result.js:192:
+30)
+    at 
+LazyResult.then (W:\TR
+abajo\Bicicolombia\For
+mulario_Bicicolombia\n
+ode_modules\postcss\li
+b\lazy-result.js:436:1
+7)[39m

@@ -1,0 +1,17 @@
+# Dependencias
+node_modules/
+
+# Build
+dist/
+build/
+
+# Variables de entorno
+.env*
+.env.*.local
+
+# Cache de Vite
+.vite/
+
+# Archivos del SO
+.DS_Store
+Thumbs.db

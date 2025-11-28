@@ -1,0 +1,613 @@
+import React, { useEffect, useState } from 'react';
+import { supabase } from '../lib/supabaseClient';
+import { useNavigate } from 'react-router-dom';
+import { Calendar as BigCalendar, dateFnsLocalizer } from 'react-big-calendar';
+import format from 'date-fns/format';
+import parse from 'date-fns/parse';
+import startOfWeek from 'date-fns/startOfWeek';
+import getDay from 'date-fns/getDay';
+import es from 'date-fns/locale/es';
+import 'react-big-calendar/lib/css/react-big-calendar.css';
+import { Calendar, Clock, CheckCircle, XCircle, RefreshCw, LogOut, Phone, AlertTriangle, X, Plus, Wrench } from 'lucide-react';
+import { SERVICE_DATA } from '../data/services';
+
+const locales = {
+    'es': es,
+};
+
+const localizer = dateFnsLocalizer({
+    format,
+    parse,
+    startOfWeek,
+    getDay,
+    locales,
+});
+
+export default function Dashboard() {
+    const [appointments, setAppointments] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [showConfirmModal, setShowConfirmModal] = useState(null); // { type: 'accept' | 'cancel', id: string }
+    const [showRescheduleModal, setShowRescheduleModal] = useState(null); // { id: string }
+    const [showNewAppointmentModal, setShowNewAppointmentModal] = useState(false);
+
+    // Reschedule state
+    const [newDate, setNewDate] = useState('');
+    const [newTime, setNewTime] = useState('');
+
+    // New Appointment State
+    const [newApp, setNewApp] = useState(() => {
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('en-CA');
+        const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+        return {
+            name: '',
+            phone: '',
+            bikeType: 'MTB',
+            date: dateStr,
+            time: timeStr,
+            comments: '',
+            selectedServices: []
+        };
+    });
+
+    // Calendar state
+    const [view, setView] = useState('month');
+    const [date, setDate] = useState(new Date());
+
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        checkUser();
+        fetchAppointments();
+    }, []);
+
+    const checkUser = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) navigate('/login');
+    };
+
+    const fetchAppointments = async () => {
+        const { data, error } = await supabase
+            .from('citas')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (data) setAppointments(data);
+        setLoading(false);
+    };
+
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
+        navigate('/login');
+    };
+
+    const updateStatus = async (id, newStatus) => {
+        const { error } = await supabase
+            .from('citas')
+            .update({ status: newStatus })
+            .eq('id', id);
+
+        if (!error) {
+            fetchAppointments();
+            setShowConfirmModal(null);
+        }
+    };
+
+    const handleReschedule = async (e) => {
+        e.preventDefault();
+        if (!showRescheduleModal || !newDate || !newTime) return;
+
+        const { error } = await supabase
+            .from('citas')
+            .update({
+                appointment_date: newDate,
+                appointment_time: newTime,
+                status: 'pending'
+            })
+            .eq('id', showRescheduleModal.id);
+
+        if (!error) {
+            fetchAppointments();
+            setShowRescheduleModal(null);
+            setNewDate('');
+            setNewTime('');
+        }
+    };
+
+    const handleNewAppServiceSelect = (service) => {
+        setNewApp(prev => {
+            const isSelected = prev.selectedServices.find(s => s.id === service.id);
+            if (isSelected) {
+                return { ...prev, selectedServices: prev.selectedServices.filter(s => s.id !== service.id) };
+            } else {
+                return { ...prev, selectedServices: [...prev.selectedServices, service] };
+            }
+        });
+    };
+
+    const handleCreateAppointment = async (e) => {
+        e.preventDefault();
+
+        if (newApp.selectedServices.length === 0) {
+            alert("Selecciona al menos un servicio.");
+            return;
+        }
+
+        const serviceNames = newApp.selectedServices.map(s => s.name).join(' + ');
+        const serviceIds = newApp.selectedServices.map(s => s.id).join(',');
+        const totalPrice = newApp.selectedServices.reduce((sum, s) => sum + s.price, 0);
+
+        const { error } = await supabase
+            .from('citas')
+            .insert([
+                {
+                    client_name: newApp.name,
+                    client_phone: newApp.phone,
+                    client_email: '', // Optional for walk-ins
+                    bike_type: newApp.bikeType,
+                    service_id: serviceIds,
+                    service_name: serviceNames,
+                    service_price: totalPrice,
+                    appointment_date: newApp.date,
+                    appointment_time: newApp.time,
+                    notes: newApp.comments,
+                    status: 'confirmed' // Walk-ins are automatically confirmed
+                }
+            ]);
+
+        if (!error) {
+            fetchAppointments();
+            setShowNewAppointmentModal(false);
+            setNewApp(prev => {
+                const now = new Date();
+                return {
+                    name: '',
+                    phone: '',
+                    bikeType: 'MTB',
+                    date: now.toLocaleDateString('en-CA'),
+                    time: now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+                    comments: '',
+                    selectedServices: []
+                };
+            });
+        } else {
+            console.error(error);
+            alert("Error al crear la cita.");
+        }
+    };
+
+    // Filter appointments
+    const recentAppointments = appointments;
+
+    // Map confirmed appointments to calendar events (Entry and Exit)
+    const events = appointments
+        .filter(app => app.status === 'confirmed')
+        .flatMap(app => {
+            const start = new Date(`${app.appointment_date}T${app.appointment_time}`);
+            const serviceNames = (app.service_name || '').split(' + ');
+
+            // Heuristic to count Express vs Normal services
+            let expressCount = 0;
+            let normalCount = 0;
+
+            serviceNames.forEach(name => {
+                const lowerName = name.toLowerCase();
+                const isExpress =
+                    lowerName.includes('despinchada') ||
+                    lowerName.includes('cambio de rin') ||
+                    lowerName.includes('cobalada') ||
+                    lowerName.includes('purgada') ||
+                    lowerName.includes('cambio pastillas') ||
+                    lowerName.includes('cambio de borradores') ||
+                    lowerName.includes('calibrada') ||
+                    lowerName.includes('cambio/alineación') ||
+                    lowerName.includes('cambio de pacha') ||
+                    lowerName.includes('engrase de centro') ||
+                    lowerName.includes('engrase caja de dirección') ||
+                    lowerName.includes('alistamiento');
+
+                if (isExpress) {
+                    expressCount++;
+                } else {
+                    normalCount++;
+                }
+            });
+
+            // Entry Event (Green)
+            const entryEvent = {
+                title: `Entrada: ${app.client_name} (${serviceNames.length} servicios)`,
+                start,
+                end: new Date(start.getTime() + 60 * 60000), // Visual duration 1h
+                resource: app,
+                type: 'entry'
+            };
+
+            // Exit Event (Red) logic
+            let exitDate = new Date(start);
+            const isMorning = start.getHours() < 12;
+
+            // Logic:
+            // 1. If (1 or 2 Express) AND (Morning) AND (No Normal) -> Same day 7pm
+            // 2. If (> 4 Normal) -> 48h
+            // 3. Else -> 24h
+
+            if (normalCount === 0 && expressCount > 0 && expressCount <= 2 && isMorning) {
+                // Express Exception
+                exitDate.setHours(19, 0, 0, 0);
+            } else if (normalCount > 4) {
+                // Volume Exception
+                exitDate.setDate(exitDate.getDate() + 2);
+            } else {
+                // Default / Mixed / Many Express
+                exitDate.setDate(exitDate.getDate() + 1);
+            }
+
+            const exitEvent = {
+                title: `Entrega: ${app.client_name}`,
+                start: exitDate,
+                end: new Date(exitDate.getTime() + 60 * 60000), // Visual duration 1h
+                resource: app,
+                type: 'exit'
+            };
+
+            return [entryEvent, exitEvent];
+        });
+
+    if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white">Cargando...</div>;
+
+    return (
+        <div className="min-h-screen bg-slate-950 text-slate-200 flex flex-col">
+            {/* --- HEADER --- */}
+            <header className="bg-slate-900 border-b border-slate-800 p-4 flex justify-between items-center sticky top-0 z-50 shadow-md">
+                <div className="flex items-center gap-3">
+                    <div className="bg-blue-600 p-2 rounded-lg">
+                        <span className="font-bold text-white text-xl tracking-tighter">BICICOLOMBIA</span>
+                    </div>
+                    <span className="text-slate-400 text-sm hidden sm:inline">Panel de Administración</span>
+                </div>
+                <div className="flex items-center gap-4">
+                    <button
+                        onClick={() => setShowNewAppointmentModal(true)}
+                        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors shadow-lg shadow-blue-600/20"
+                    >
+                        <Plus size={18} />
+                        <span className="hidden sm:inline">Nueva Cita</span>
+                    </button>
+                    <button
+                        onClick={handleLogout}
+                        className="flex items-center gap-2 text-slate-400 hover:text-red-400 transition-colors text-sm font-medium"
+                    >
+                        <LogOut size={16} /> <span className="hidden sm:inline">Salir</span>
+                    </button>
+                </div>
+            </header>
+
+            {/* --- MAIN CONTENT --- */}
+            <main className="flex-1 flex flex-col overflow-hidden">
+
+                {/* --- TOP PANEL: RECENT REQUESTS (Horizontal Slider) --- */}
+                <div className="bg-slate-900/50 border-b border-slate-800 p-6 flex-shrink-0">
+                    <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                        <Clock className="text-blue-500" size={20} />
+                        Solicitudes Recientes
+                        <span className="bg-slate-700 text-white text-xs px-2 py-0.5 rounded-full">{recentAppointments.length}</span>
+                    </h2>
+
+                    {recentAppointments.length === 0 ? (
+                        <div className="text-slate-500 text-sm italic">No hay solicitudes registradas.</div>
+                    ) : (
+                        <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-900 snap-x">
+                            {recentAppointments.map((app) => (
+                                <div key={app.id} className={`min-w-[320px] rounded-xl p-4 border shadow-lg relative group transition-all snap-start flex-shrink-0 ${app.status === 'pending' ? 'bg-slate-800 border-blue-500/30' :
+                                    app.status === 'confirmed' ? 'bg-slate-900 border-emerald-500/30 opacity-75 hover:opacity-100' :
+                                        'bg-slate-900 border-red-500/30 opacity-60 hover:opacity-100'
+                                    }`}>
+                                    <div className="flex justify-between items-start mb-3">
+                                        <div>
+                                            <h3 className="font-bold text-white truncate w-48" title={app.client_name}>{app.client_name}</h3>
+                                            <p className="text-xs text-slate-400 flex items-center gap-1"><Phone size={10} /> {app.client_phone}</p>
+                                        </div>
+                                        <span className={`text-[10px] font-bold px-2 py-1 rounded uppercase ${app.status === 'pending' ? 'bg-blue-500/20 text-blue-400' :
+                                            app.status === 'confirmed' ? 'bg-emerald-500/20 text-emerald-400' :
+                                                'bg-red-500/20 text-red-400'
+                                            }`}>
+                                            {app.status === 'pending' ? 'Pendiente' :
+                                                app.status === 'confirmed' ? 'Confirmada' : 'Cancelada'}
+                                        </span>
+                                    </div>
+
+                                    <div className="bg-slate-950/50 p-2 rounded mb-3 text-sm border border-slate-800">
+                                        <p className="text-slate-300 font-medium truncate" title={app.service_name}>{app.service_name}</p>
+                                        <div className="flex justify-between mt-1 text-xs text-slate-500">
+                                            <span>{app.appointment_date}</span>
+                                            <span>{app.appointment_time}</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Actions only for pending or confirmed (to cancel) */}
+                                    <div className="flex gap-2 mt-2">
+                                        {app.status !== 'cancelled' && (
+                                            <>
+                                                {app.status === 'pending' && (
+                                                    <button
+                                                        onClick={() => setShowConfirmModal({ type: 'accept', id: app.id })}
+                                                        className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-1.5 rounded text-xs font-bold transition-colors"
+                                                    >
+                                                        Aceptar
+                                                    </button>
+                                                )}
+                                                <button
+                                                    onClick={() => {
+                                                        setShowRescheduleModal({ id: app.id });
+                                                        setNewDate(app.appointment_date);
+                                                        setNewTime(app.appointment_time);
+                                                    }}
+                                                    className="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-1.5 rounded text-xs font-bold transition-colors"
+                                                >
+                                                    Cambio
+                                                </button>
+                                                <button
+                                                    onClick={() => setShowConfirmModal({ type: 'cancel', id: app.id })}
+                                                    className="flex-1 bg-red-600/20 hover:bg-red-600 hover:text-white text-red-400 py-1.5 rounded text-xs font-bold transition-colors"
+                                                >
+                                                    Cancelar
+                                                </button>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* --- BOTTOM PANEL: CALENDAR --- */}
+                <div className="flex-1 p-6 bg-slate-950 overflow-hidden flex flex-col">
+                    <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                        <Calendar className="text-emerald-500" size={20} />
+                        Agenda Confirmada
+                    </h2>
+                    <div className="flex-1 bg-slate-900 rounded-xl border border-slate-800 p-4 shadow-inner text-slate-300">
+                        <BigCalendar
+                            localizer={localizer}
+                            events={events}
+                            startAccessor="start"
+                            endAccessor="end"
+                            style={{ height: '100%' }}
+                            culture='es'
+                            view={view}
+                            onView={setView}
+                            date={date}
+                            onNavigate={setDate}
+                            min={new Date(0, 0, 0, 9, 0, 0)}
+                            max={new Date(0, 0, 0, 19, 0, 0)}
+                            messages={{
+                                next: "Siguiente",
+                                previous: "Anterior",
+                                today: "Hoy",
+                                month: "Mes",
+                                week: "Semana",
+                                day: "Día",
+                                agenda: "Agenda",
+                                date: "Fecha",
+                                time: "Hora",
+                                event: "Evento",
+                                noEventsInRange: "No hay citas en este rango."
+                            }}
+                            eventPropGetter={(event) => ({
+                                style: {
+                                    backgroundColor: event.type === 'entry' ? '#10b981' : '#ef4444', // Green for entry, Red for exit
+                                    borderRadius: '4px',
+                                    opacity: 0.8,
+                                    color: 'white',
+                                    border: '0px',
+                                    display: 'block'
+                                }
+                            })}
+                        />
+                    </div>
+                </div>
+            </main>
+
+            {/* --- MODALS --- */}
+
+            {/* NEW APPOINTMENT MODAL */}
+            {showNewAppointmentModal && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 max-w-2xl w-full shadow-2xl animate-fade-in-up max-h-[90vh] overflow-y-auto">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                                <Plus className="text-blue-500" /> Nueva Cita (Físico)
+                            </h3>
+                            <button onClick={() => setShowNewAppointmentModal(false)} className="text-slate-500 hover:text-white">
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleCreateAppointment} className="space-y-6">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Nombre Cliente</label>
+                                    <input
+                                        required
+                                        type="text"
+                                        value={newApp.name}
+                                        onChange={(e) => setNewApp({ ...newApp, name: e.target.value })}
+                                        className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Teléfono</label>
+                                    <input
+                                        required
+                                        type="tel"
+                                        value={newApp.phone}
+                                        onChange={(e) => setNewApp({ ...newApp, phone: e.target.value })}
+                                        className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Tipo Bici</label>
+                                    <select
+                                        value={newApp.bikeType}
+                                        onChange={(e) => setNewApp({ ...newApp, bikeType: e.target.value })}
+                                        className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                                    >
+                                        <option value="MTB">MTB</option>
+                                        <option value="Ruta">Ruta</option>
+                                        <option value="Urbana">Urbana</option>
+                                        <option value="Eléctrica">Eléctrica</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Fecha</label>
+                                    <input
+                                        required
+                                        type="date"
+                                        value={newApp.date}
+                                        onChange={(e) => setNewApp({ ...newApp, date: e.target.value })}
+                                        className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Hora</label>
+                                    <input
+                                        required
+                                        type="time"
+                                        value={newApp.time}
+                                        onChange={(e) => setNewApp({ ...newApp, time: e.target.value })}
+                                        className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Servicios ({newApp.selectedServices.length})</label>
+                                <div className="bg-slate-950 border border-slate-800 rounded-lg p-4 max-h-48 overflow-y-auto space-y-2">
+                                    {SERVICE_DATA.map((cat, idx) => (
+                                        <div key={idx}>
+                                            <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">{cat.category}</p>
+                                            {cat.items.map(service => {
+                                                const isSelected = newApp.selectedServices.some(s => s.id === service.id);
+                                                return (
+                                                    <div
+                                                        key={service.id}
+                                                        onClick={() => handleNewAppServiceSelect(service)}
+                                                        className={`flex items-center justify-between p-2 rounded cursor-pointer text-sm ${isSelected ? 'bg-blue-900/30 text-blue-400' : 'hover:bg-slate-900 text-slate-300'}`}
+                                                    >
+                                                        <span>{service.name}</span>
+                                                        {isSelected && <CheckCircle size={14} />}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Notas</label>
+                                <textarea
+                                    rows="2"
+                                    value={newApp.comments}
+                                    onChange={(e) => setNewApp({ ...newApp, comments: e.target.value })}
+                                    className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none resize-none"
+                                ></textarea>
+                            </div>
+
+                            <button
+                                type="submit"
+                                className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-4 rounded-lg shadow-lg shadow-blue-600/20 transition-all active:scale-95"
+                            >
+                                Crear Cita Confirmada
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* CONFIRMATION MODAL */}
+            {showConfirmModal && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 max-w-sm w-full shadow-2xl animate-fade-in-up">
+                        <div className="flex justify-center mb-4 text-amber-500">
+                            <AlertTriangle size={48} />
+                        </div>
+                        <h3 className="text-xl font-bold text-white text-center mb-2">
+                            ¿Estás seguro?
+                        </h3>
+                        <p className="text-slate-400 text-center mb-6 text-sm">
+                            {showConfirmModal.type === 'accept'
+                                ? "Vas a confirmar esta cita. Se enviará una notificación al cliente."
+                                : "Vas a cancelar esta cita. Esta acción no se puede deshacer."}
+                        </p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowConfirmModal(null)}
+                                className="flex-1 py-2.5 rounded-lg border border-slate-700 text-slate-300 font-medium hover:bg-slate-800 transition-colors"
+                            >
+                                Volver
+                            </button>
+                            <button
+                                onClick={() => updateStatus(showConfirmModal.id, showConfirmModal.type === 'accept' ? 'confirmed' : 'cancelled')}
+                                className={`flex-1 py-2.5 rounded-lg font-bold text-white transition-colors ${showConfirmModal.type === 'accept' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-red-600 hover:bg-red-500'
+                                    }`}
+                            >
+                                {showConfirmModal.type === 'accept' ? 'Confirmar' : 'Cancelar Cita'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* RESCHEDULE MODAL */}
+            {showRescheduleModal && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 max-w-sm w-full shadow-2xl animate-fade-in-up">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-xl font-bold text-white">Reprogramar Cita</h3>
+                            <button onClick={() => setShowRescheduleModal(null)} className="text-slate-500 hover:text-white">
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleReschedule} className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Nueva Fecha</label>
+                                <input
+                                    required
+                                    type="date"
+                                    min={new Date().toISOString().split('T')[0]}
+                                    value={newDate}
+                                    onChange={(e) => setNewDate(e.target.value)}
+                                    className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Nueva Hora</label>
+                                <input
+                                    required
+                                    type="time"
+                                    min="09:00"
+                                    max="19:00"
+                                    value={newTime}
+                                    onChange={(e) => setNewTime(e.target.value)}
+                                    className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                                />
+                            </div>
+                            <button
+                                type="submit"
+                                className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-4 rounded-lg shadow-lg shadow-blue-600/20 transition-all active:scale-95 mt-2"
+                            >
+                                Guardar Cambios
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
