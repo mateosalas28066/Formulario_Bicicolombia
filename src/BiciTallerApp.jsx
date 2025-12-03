@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from './lib/supabaseClient';
 import {
     Calendar,
@@ -38,16 +38,37 @@ const TEAM_DATA = [
     }
 ];
 
+// Generate time slots from 9:00 AM to 7:00 PM
+const TIME_SLOTS = [];
+for (let hour = 9; hour < 19; hour++) {
+    TIME_SLOTS.push(`${hour.toString().padStart(2, '0')}:00`);
+    TIME_SLOTS.push(`${hour.toString().padStart(2, '0')}:30`);
+}
+TIME_SLOTS.push("19:00");
+
 export default function BiciAgenda() {
     const [step, setStep] = useState(1);
     const [selectedServices, setSelectedServices] = useState([]);
     const [formData, setFormData] = useState(() => {
         const now = new Date();
         const dateStr = now.toLocaleDateString('en-CA');
-        const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+        // Default to next available slot or 09:00 if late
+        let defaultTime = "09:00";
+        const currentHour = now.getHours();
+        const currentMinute = now.getMinutes();
+
+        // Simple logic to find next slot
+        for (let slot of TIME_SLOTS) {
+            const [h, m] = slot.split(':').map(Number);
+            if (h > currentHour || (h === currentHour && m > currentMinute)) {
+                defaultTime = slot;
+                break;
+            }
+        }
+
         return {
             date: dateStr,
-            time: timeStr,
+            time: defaultTime,
             name: '',
             phone: '',
             email: '',
@@ -56,24 +77,19 @@ export default function BiciAgenda() {
         };
     });
 
-    useEffect(() => {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    }, [step]);
-
-    const handleServiceSelect = (service) => {
-        setSelectedServices(prev => {
-            const isSelected = prev.find(s => s.id === service.id);
-            if (isSelected) {
-                return prev.filter(s => s.id !== service.id);
-            } else {
-                return [...prev, service];
-            }
-        });
-    };
-
     const handleInputChange = (e) => {
         const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
+        setFormData(prev => ({
+            ...prev,
+            [name]: value
+        }));
+    };
+
+    const handleTimeSelect = (time) => {
+        setFormData(prev => ({
+            ...prev,
+            time
+        }));
     };
 
     const getTotalPrice = () => {
@@ -86,6 +102,32 @@ export default function BiciAgenda() {
 
     const getServiceIds = () => {
         return selectedServices.map(s => s.id).join(',');
+    };
+
+    // Video reference
+    const videoRef = useRef(null);
+
+    // Effect to handle video playback
+    useEffect(() => {
+        if (videoRef.current) {
+            if (selectedServices.length > 0) {
+                videoRef.current.currentTime = 0;
+                videoRef.current.play().catch(error => console.log("Video play failed:", error));
+            } else {
+                videoRef.current.pause();
+            }
+        }
+    }, [selectedServices]);
+
+    const handleServiceSelect = (service) => {
+        setSelectedServices(prev => {
+            const isSelected = prev.find(s => s.id === service.id);
+            if (isSelected) {
+                return prev.filter(s => s.id !== service.id);
+            } else {
+                return [...prev, service];
+            }
+        });
     };
 
     const isAllExpress = () => {
@@ -115,6 +157,42 @@ export default function BiciAgenda() {
                 ]);
 
             if (error) throw error;
+
+            // Trigger n8n Webhook
+            const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL;
+            console.log('Attempting to send webhook to:', webhookUrl);
+
+            if (webhookUrl) {
+                const payload = {
+                    client_name: formData.name,
+                    client_phone: formData.phone,
+                    bike_type: formData.bikeType,
+                    service_name: getServiceNames(),
+                    service_price: getTotalPrice(),
+                    appointment_date: formData.date,
+                    appointment_time: formData.time,
+                    notes: formData.comments,
+                    created_at: new Date().toISOString()
+                };
+                console.log('Webhook Payload:', payload);
+
+                fetch(webhookUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(payload)
+                })
+                    .then(response => {
+                        console.log('Webhook Response Status:', response.status);
+                        return response.text();
+                    })
+                    .then(data => console.log('Webhook Response Data:', data))
+                    .catch(err => console.error('Webhook Error:', err));
+            } else {
+                console.warn('No VITE_N8N_WEBHOOK_URL defined in .env');
+            }
+
             setStep(3);
         } catch (error) {
             console.error('Error saving appointment:', error);
@@ -126,8 +204,8 @@ export default function BiciAgenda() {
         if (selectedServices.length === 0 || !formData.date || !formData.time) return '#';
         const startTime = new Date(`${formData.date}T${formData.time}`);
         const endTime = new Date(startTime.getTime() + 60 * 60 * 1000);
-        const formatTime = (date) => date.toISOString().replace(/-|:|\.\d\d\d/g, "");
-        const details = `Cliente: ${formData.name}\nTel: ${formData.phone}\nBici: ${formData.bikeType}\nNota: ${formData.comments}`;
+        const formatTime = (date) => date.toISOString().replace(/-|:|\\.\\d\\d\\d/g, "");
+        const details = `Cliente: ${formData.name}\\nTel: ${formData.phone}\\nBici: ${formData.bikeType}\\nNota: ${formData.comments}`;
         const title = `Cita Taller: ${getServiceNames()}`;
         return `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${formatTime(startTime)}/${formatTime(endTime)}&details=${encodeURIComponent(details)}&location=Taller Bicicolombia`;
     };
@@ -137,8 +215,7 @@ export default function BiciAgenda() {
     };
 
     return (
-        // Changed main background to very dark slate
-        <div className="min-h-screen bg-slate-950 font-sans text-slate-200" >
+        <div className="min-h-screen bg-slate-950 font-sans text-slate-200">
             <style>{`
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(-10px); }
@@ -157,47 +234,32 @@ export default function BiciAgenda() {
         /* Custom scrollbar for dark mode */
         ::-webkit-scrollbar {
           width: 8px;
+          height: 8px;
         }
         ::-webkit-scrollbar-track {
-          background: #0f172a; 
+          background: #0f172a;
         }
         ::-webkit-scrollbar-thumb {
-          background: #334155; 
+          background: #334155;
           border-radius: 4px;
         }
         ::-webkit-scrollbar-thumb:hover {
-          background: #475569; 
+          background: #475569;
+        }
+
+        /* Hide scrollbar for time picker but keep functionality */
+        .no-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+        .no-scrollbar {
+          -ms-overflow-style: none;  /* IE and Edge */
+          scrollbar-width: none;  /* Firefox */
         }
       `}</style>
 
-            {/* --- HEADER --- */}
-            {/* Changed to dark with blur and border */}
-            <header className="bg-slate-900/90 backdrop-blur-md text-white border-b border-slate-800 sticky top-0 z-50" >
-                <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                        <div className="bg-blue-600 p-2 rounded-full shadow-lg shadow-blue-500/20">
-                            <Wrench className="text-white w-6 h-6" />
-                        </div>
-                        <div>
-                            <h1 className="text-xl font-bold leading-none tracking-tight">BICICOLOMBIA</h1>
-                            <p className="text-xs text-slate-400">Taller Especializado</p>
-                        </div>
-                    </div>
-                    <a
-                        href="https://wa.me/573000000000"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white px-3 py-1.5 rounded-full text-sm font-medium transition-all hover:shadow-lg hover:shadow-green-500/20"
-                    >
-                        <MessageCircle size={16} />
-                        <span className="hidden sm:inline">WhatsApp</span>
-                    </a>
-                </div>
-            </header >
-
             <main className="max-w-6xl mx-auto px-4 py-8">
 
-                <div className="grid md:grid-cols-3 gap-8">
+                <div className="grid md:grid-cols-3 gap-8 items-start">
 
                     {/* --- LEFT COLUMN: CONTENT --- */}
                     <div className="md:col-span-2 space-y-6">
@@ -219,32 +281,33 @@ export default function BiciAgenda() {
                                             {category.items.map((service) => {
                                                 const isSelected = selectedServices.some(s => s.id === service.id);
                                                 return (
-                                                    <button
+                                                    <div
                                                         key={service.id}
                                                         onClick={() => handleServiceSelect(service)}
-                                                        className={`w-full text-left px-4 py-4 flex justify-between items-center hover:bg-slate-800 transition-all duration-200 group ${isSelected ? 'bg-blue-900/20 ring-1 ring-inset ring-blue-500/50' : ''}`}
+                                                        className={`p-4 cursor-pointer transition-all hover:bg-slate-800/50 flex items-center justify-between group ${isSelected ? 'bg-blue-900/20' : ''}`}
                                                     >
-                                                        <div>
-                                                            <p className={`font-medium ${isSelected ? 'text-blue-400' : 'text-slate-200'} group-hover:text-blue-400 transition-colors`}>{service.name}</p>
-                                                            <div className="flex items-center gap-3 mt-1.5">
-                                                                <span className="text-emerald-400 font-bold tracking-tight">{formatPrice(service.price)}</span>
-                                                                {service.express ? (
-                                                                    <span className="text-[10px] bg-red-900/30 text-red-400 px-2 py-0.5 rounded-full font-bold uppercase tracking-wide border border-red-900/50 flex items-center gap-1">
-                                                                        <Clock size={10} /> Express
-                                                                    </span>
-                                                                ) : (
-                                                                    <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full font-medium border border-slate-700">
-                                                                        24h
-                                                                    </span>
-                                                                )}
+                                                        <div className="flex items-center gap-4">
+                                                            <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${isSelected ? 'bg-blue-500 border-blue-500' : 'border-slate-600 group-hover:border-blue-400'}`}>
+                                                                {isSelected && <CheckCircle size={14} className="text-white" />}
+                                                            </div>
+                                                            <div>
+                                                                <p className={`font-medium transition-colors ${isSelected ? 'text-blue-400' : 'text-slate-200 group-hover:text-white'}`}>{service.name}</p>
+                                                                <p className="text-xs text-slate-500">{service.description}</p>
                                                             </div>
                                                         </div>
-                                                        {isSelected ? (
-                                                            <CheckCircle className="text-blue-500 w-5 h-5 shadow-lg shadow-blue-500/50 rounded-full" />
-                                                        ) : (
-                                                            <div className="w-5 h-5 rounded-full border border-slate-600 group-hover:border-blue-500 transition-colors"></div>
-                                                        )}
-                                                    </button>
+                                                        <div className="text-right">
+                                                            <p className="font-bold text-emerald-400">{formatPrice(service.price)}</p>
+                                                            {service.express ? (
+                                                                <span className="text-[10px] bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full font-bold uppercase tracking-wide border border-amber-500/30 flex items-center gap-1 justify-end mt-1">
+                                                                    <Clock size={10} /> Express
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full font-medium border border-slate-700 mt-1 inline-block">
+                                                                    24h
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
                                                 );
                                             })}
                                         </div>
@@ -284,7 +347,7 @@ export default function BiciAgenda() {
                                     </div>
 
                                     <form onSubmit={handleSubmit} className="space-y-6">
-                                        <div className="grid grid-cols-2 gap-6">
+                                        <div className="grid md:grid-cols-2 gap-6">
                                             <div>
                                                 <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Fecha</label>
                                                 <input
@@ -297,19 +360,24 @@ export default function BiciAgenda() {
                                                     className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                                                 />
                                             </div>
-                                            <div>
+                                            <div className="min-w-0 w-full overflow-hidden">
                                                 <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Hora</label>
-                                                <input
-                                                    required
-                                                    type="time"
-                                                    name="time"
-                                                    min="09:00"
-                                                    max="19:00"
-                                                    value={formData.time}
-                                                    onChange={handleInputChange}
-                                                    className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-                                                />
-                                                <p className="text-[10px] text-slate-500 mt-2 text-right">9:00 AM - 7:00 PM</p>
+                                                {/* Horizontal Scroll Time Picker */}
+                                                <div className="flex gap-2 overflow-x-auto pb-2 snap-x w-full no-scrollbar">
+                                                    {TIME_SLOTS.map(slot => (
+                                                        <button
+                                                            key={slot}
+                                                            type="button"
+                                                            onClick={() => handleTimeSelect(slot)}
+                                                            className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all border snap-start whitespace-nowrap ${formData.time === slot
+                                                                ? 'bg-blue-600 text-white border-blue-500 shadow-[0_0_15px_rgba(37,99,235,0.5)]'
+                                                                : 'bg-transparent text-slate-400 border-slate-700 hover:bg-blue-500/10 hover:border-blue-500 hover:text-blue-400'
+                                                                }`}
+                                                        >
+                                                            {slot}
+                                                        </button>
+                                                    ))}
+                                                </div>
                                             </div>
                                         </div>
 
@@ -361,7 +429,7 @@ export default function BiciAgenda() {
                                             <textarea
                                                 name="comments"
                                                 rows="3"
-                                                placeholder="Ej: Tiene un ruido extraño al frenar..."
+                                                placeholder="Detalles adicionales sobre el servicio..."
                                                 value={formData.comments}
                                                 onChange={handleInputChange}
                                                 className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all resize-none"
@@ -370,7 +438,7 @@ export default function BiciAgenda() {
 
                                         <button
                                             type="submit"
-                                            className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-4 rounded-lg shadow-lg shadow-blue-600/20 transition-all active:scale-95 mt-4"
+                                            className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-500/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
                                         >
                                             Confirmar Cita
                                         </button>
@@ -379,190 +447,158 @@ export default function BiciAgenda() {
                             </div>
                         )}
 
-                        {/* --- STEP 3: CONFIRMACIÓN --- */}
+                        {/* --- STEP 3: CONFIRMATION --- */}
                         {step === 3 && (
-                            <div className="animate-fade-in text-center pt-4">
-                                <div className="w-24 h-24 bg-emerald-500/10 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-8 border border-emerald-500/20 shadow-[0_0_30px_rgba(16,185,129,0.1)]">
-                                    <CheckCircle size={48} />
+                            <div className="animate-fade-in text-center py-10">
+                                <div className="bg-green-500/10 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+                                    <CheckCircle className="text-green-500 w-10 h-10" />
                                 </div>
-                                <h2 className="text-4xl font-bold text-white mb-4">¡Cita Agendada!</h2>
-                                <p className="text-slate-400 mb-10 text-lg">Gracias {formData.name}, te esperamos para dejar tu bicicleta como nueva.</p>
+                                <h2 className="text-3xl font-bold text-white mb-4">¡Cita Agendada!</h2>
+                                <p className="text-slate-400 mb-8 max-w-md mx-auto">
+                                    Tu cita ha sido registrada exitosamente. Te hemos enviado un correo con los detalles.
+                                </p>
 
-                                <div className="bg-slate-900 rounded-xl shadow-lg border border-slate-800 p-8 mb-8 text-left relative overflow-hidden max-w-xl mx-auto">
-                                    <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
-
-                                    <div className="grid grid-cols-2 gap-y-6 text-sm relative z-10">
-                                        <div className="text-slate-500 uppercase font-bold tracking-wider text-xs pt-1">Servicios ({selectedServices.length})</div>
-                                        <div className="font-bold text-white text-right text-base">
-                                            <ul className="list-none">
-                                                {selectedServices.map(s => (
-                                                    <li key={s.id} className="truncate max-w-[200px] ml-auto">{s.name}</li>
-                                                ))}
-                                            </ul>
+                                <div className="bg-slate-900 p-6 rounded-xl border border-slate-800 max-w-md mx-auto mb-8 text-left">
+                                    <h3 className="text-lg font-bold text-white mb-4 border-b border-slate-800 pb-2">Resumen</h3>
+                                    <div className="space-y-3 text-sm">
+                                        <div className="flex justify-between">
+                                            <span className="text-slate-400">Servicio:</span>
+                                            <span className="text-slate-200 font-medium">{getServiceNames()}</span>
                                         </div>
-
-                                        <div className="text-slate-500 uppercase font-bold tracking-wider text-xs pt-1">Fecha</div>
-                                        <div className="font-bold text-white text-right text-base">{formData.date} - {formData.time}</div>
-
-                                        <div className="text-slate-500 uppercase font-bold tracking-wider text-xs pt-1">Total</div>
-                                        <div className="font-bold text-emerald-400 text-right text-base">{formatPrice(getTotalPrice())}</div>
+                                        <div className="flex justify-between">
+                                            <span className="text-slate-400">Fecha:</span>
+                                            <span className="text-slate-200 font-medium">{formData.date}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-slate-400">Hora:</span>
+                                            <span className="text-slate-200 font-medium">{formData.time}</span>
+                                        </div>
+                                        <div className="flex justify-between pt-2 border-t border-slate-800">
+                                            <span className="text-slate-400">Total:</span>
+                                            <span className="text-emerald-400 font-bold">{formatPrice(getTotalPrice())}</span>
+                                        </div>
                                     </div>
                                 </div>
 
-                                <div className="space-y-4 max-w-xl mx-auto">
+                                <div className="flex flex-col sm:flex-row gap-4 justify-center">
                                     <a
                                         href={generateCalendarLink()}
                                         target="_blank"
                                         rel="noreferrer"
-                                        className="block w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-4 rounded-lg flex items-center justify-center gap-3 transition-colors shadow-lg shadow-blue-600/20"
+                                        className="bg-slate-800 hover:bg-slate-700 text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
                                     >
-                                        <Calendar size={20} />
+                                        <Calendar size={18} />
                                         Agregar a Google Calendar
                                     </a>
-
                                     <button
                                         onClick={() => {
                                             setStep(1);
+                                            setFormData(prev => ({
+                                                ...prev,
+                                                name: '',
+                                                phone: '',
+                                                email: '',
+                                                bikeType: 'MTB',
+                                                comments: ''
+                                            }));
                                             setSelectedServices([]);
-                                            setFormData({ ...formData, comments: '' });
                                         }}
-                                        className="block w-full bg-slate-900 border border-slate-800 text-slate-400 font-medium py-4 px-4 rounded-lg hover:bg-slate-800 hover:text-white transition-colors"
+                                        className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-lg font-medium transition-colors"
                                     >
-                                        Agendar otro servicio
+                                        Agendar Nueva Cita
                                     </button>
                                 </div>
+                            </div>
+                        )}
 
-                                <div className="mt-12 flex items-center justify-center gap-2 text-xs text-slate-500 font-medium tracking-wide">
-                                    <MapPin size={12} />
-                                    <span>CALLE 5 # 34-12, CALI, COLOMBIA</span>
+                    </div>
+
+                    {/* --- RIGHT COLUMN: INFO & VIDEO --- */}
+                    <div className="space-y-6">
+
+                        {/* VIDEO CARD */}
+                        <div className="bg-slate-900 rounded-xl shadow-lg border border-slate-800 overflow-hidden">
+                            <div className="relative aspect-video bg-slate-950">
+                                <video
+                                    ref={videoRef}
+                                    src={videoEjemplo}
+                                    className="w-full h-full object-cover opacity-80 hover:opacity-100 transition-opacity"
+                                    controls={false}
+                                    muted
+                                    loop
+                                    poster="https://images.unsplash.com/photo-1571068316344-75bc76f77890?auto=format&fit=crop&q=80&w=800"
+                                />
+                                <div className="absolute top-2 right-2 bg-red-600 text-white text-[10px] font-bold px-2 py-1 rounded flex items-center gap-1 animate-pulse">
+                                    <Video size={10} /> LIVE
                                 </div>
+                            </div>
+                            <div className="p-4">
+                                <h3 className="font-bold text-white mb-1">Taller en Vivo</h3>
+                                <p className="text-xs text-slate-400">Mira cómo trabajamos en tu bicicleta en tiempo real.</p>
+                            </div>
+                        </div>
+
+                        {/* --- SELECTED SERVICES SUMMARY (Step 1 Only) --- */}
+                        {step === 1 && (
+                            <div className="bg-slate-900 rounded-xl shadow-lg border border-slate-800 p-5 sticky top-4">
+                                <h3 className="font-bold text-white mb-4 flex items-center gap-2">
+                                    <Wrench size={16} className="text-blue-500" />
+                                    Resumen
+                                </h3>
+
+                                {selectedServices.length === 0 ? (
+                                    <p className="text-sm text-slate-500 text-center py-4">
+                                        Selecciona un servicio para continuar
+                                    </p>
+                                ) : (
+                                    <div className="space-y-4">
+                                        <div className="space-y-2">
+                                            {selectedServices.map(s => (
+                                                <div key={s.id} className="flex justify-between text-sm">
+                                                    <span className="text-slate-300">{s.name}</span>
+                                                    <span className="text-emerald-400 font-medium">{formatPrice(s.price)}</span>
+                                                </div>
+                                            ))}
+                                            <div className="border-t border-slate-800 pt-2 flex justify-between font-bold">
+                                                <span className="text-white">Total</span>
+                                                <span className="text-emerald-400">{formatPrice(getTotalPrice())}</span>
+                                            </div>
+                                        </div>
+
+                                        <button
+                                            onClick={() => setStep(2)}
+                                            className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-lg font-bold shadow-lg shadow-blue-500/20 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2"
+                                        >
+                                            Continuar
+                                            <ChevronRight size={18} />
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
 
-                    {/* --- RIGHT COLUMN: STICKY SIDEBAR --- */}
-                    <div className="md:col-span-1 relative">
-                        <div className="sticky top-24 space-y-6">
-
-                            {/* --- STEPS INDICATOR (MOVED HERE) --- */}
-                            <div className="bg-slate-900 rounded-xl border border-slate-800 p-4 shadow-lg">
-                                <div className="flex flex-col gap-4">
-                                    <div className={`flex items-center gap-3 ${step >= 1 ? 'text-blue-400' : 'text-slate-500'}`}>
-                                        <span className={`w-8 h-8 rounded-full flex items-center justify-center border text-sm font-bold transition-all ${step >= 1 ? 'border-blue-500 bg-blue-500/10 text-blue-400' : 'border-slate-700 bg-slate-800'}`}>1</span>
-                                        <span className="font-medium text-sm">Seleccionar Servicio</span>
-                                    </div>
-                                    {/* Connector Line */}
-                                    <div className="w-0.5 h-4 bg-slate-800 ml-4"></div>
-
-                                    <div className={`flex items-center gap-3 ${step >= 2 ? 'text-blue-400' : 'text-slate-500'}`}>
-                                        <span className={`w-8 h-8 rounded-full flex items-center justify-center border text-sm font-bold transition-all ${step >= 2 ? 'border-blue-500 bg-blue-500/10 text-blue-400' : 'border-slate-700 bg-slate-800'}`}>2</span>
-                                        <span className="font-medium text-sm">Datos del Cliente</span>
-                                    </div>
-                                    {/* Connector Line */}
-                                    <div className="w-0.5 h-4 bg-slate-800 ml-4"></div>
-
-                                    <div className={`flex items-center gap-3 ${step >= 3 ? 'text-blue-400' : 'text-slate-500'}`}>
-                                        <span className={`w-8 h-8 rounded-full flex items-center justify-center border text-sm font-bold transition-all ${step >= 3 ? 'border-blue-500 bg-blue-500/10 text-blue-400' : 'border-slate-700 bg-slate-800'}`}>3</span>
-                                        <span className="font-medium text-sm">Confirmación</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Video Container - Only visible when service selected */}
-                            {selectedServices.length > 0 ? (
-                                <div className="bg-slate-900 rounded-xl overflow-hidden shadow-2xl aspect-video relative group border border-slate-800 animate-fade-in">
-                                    <video
-                                        className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-700"
-                                        autoPlay
-                                        muted
-                                        loop
-                                        playsInline
-                                        poster="https://images.unsplash.com/photo-1616428612745-0d04c107f9c2?auto=format&fit=crop&q=80"
-                                        src={videoEjemplo}
-                                    />
-                                    {/* Dark gradient overlay */}
-                                    <div className="absolute inset-0 flex items-end p-4 bg-gradient-to-t from-slate-950 via-slate-900/50 to-transparent">
-                                        <div>
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.6)]"></div>
-                                                <p className="text-white text-[10px] uppercase tracking-wider font-bold">Referencia Técnica</p>
-                                            </div>
-                                            <p className="text-slate-100 font-medium text-sm leading-tight drop_shadow-md">
-                                                Procedimiento para: <span className="text-blue-400">{selectedServices[selectedServices.length - 1].name}</span>
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="bg-slate-900/50 rounded-xl border border-slate-800 p-8 text-center animate-fade-in">
-                                    <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-600">
-                                        <Video size={32} />
-                                    </div>
-                                    <p className="text-slate-400 text-sm font-medium">Selecciona un servicio para ver el video de referencia.</p>
-                                </div>
-                            )}
-
-                            {/* Info Card */}
-                            {selectedServices.length > 0 && (
-                                <div className="bg-slate-800/50 border border-slate-700/50 backdrop-blur-sm rounded-xl p-5 animate-fade-in-up shadow-lg">
-                                    <h3 className="font-bold text-blue-400 mb-2 text-sm uppercase tracking-wide">Resumen</h3>
-                                    <p className="text-sm text-slate-300 mb-4 font-medium">{selectedServices.length} servicios seleccionados</p>
-
-                                    <div className="flex items-start gap-3 mb-5 bg-slate-900/50 p-3 rounded-lg border border-slate-800">
-                                        <Info className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                                        <p className="text-xs text-slate-400 leading-relaxed">
-                                            {isAllExpress()
-                                                ? "Servicios de mecánica rápida. Si los traes en la mañana, podrían estar listos hoy mismo."
-                                                : "Incluye servicios especializados. Requiere dejar la bicicleta para garantizar la mejor calidad (24-48h)."}
-                                        </p>
-                                    </div>
-
-                                    {step === 1 && (
-                                        <button
-                                            onClick={() => setStep(2)}
-                                            className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg shadow-blue-600/20"
-                                        >
-                                            Continuar <ChevronRight size={18} />
-                                        </button>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    </div>
                 </div>
 
-                {/* --- SECCIÓN: NUESTRO EQUIPO (Dark Style Refined) --- */}
-                <div className="bg-slate-900 rounded-2xl p-8 md:p-12 mt-20 animate-fade-in shadow-2xl border border-slate-800">
-                    <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-6 border-b border-slate-800 pb-8">
-                        <div>
-                            <h2 className="text-3xl font-bold mb-2 text-white">Nuestro Equipo</h2>
-                            <p className="text-blue-400 font-medium">Expertos apasionados por el ciclismo</p>
-                        </div>
-                        <p className="text-slate-500 max-w-md text-sm md:text-right italic">
-                            "El talento gana partidos, pero el trabajo en equipo y la inteligencia ganan campeonatos."
-                        </p>
-                    </div>
-
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+                {/* --- FOOTER: TEAM --- */}
+                <div className="mt-12 pt-8 border-t border-slate-800">
+                    <h3 className="font-bold text-white mb-6 flex items-center gap-2 text-xl">
+                        <Info size={24} className="text-blue-500" />
+                        Nuestro Equipo
+                    </h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                         {TEAM_DATA.map((member, idx) => (
-                            <div key={idx} className="group cursor-pointer">
-                                <div className="aspect-square overflow-hidden rounded-xl mb-4 bg-slate-950 relative border border-slate-800 shadow-lg">
-                                    {/* Gradient overlay on hover */}
-                                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950 to-transparent opacity-60 group-hover:opacity-0 transition-all duration-500 z-10"></div>
-                                    <img
-                                        src={member.image}
-                                        alt={member.name}
-                                        className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700 transform group-hover:scale-110"
-                                    />
+                            <div key={idx} className="bg-slate-900 rounded-xl p-4 border border-slate-800 flex flex-col items-center text-center">
+                                <img src={member.image} alt={member.name} className="w-20 h-20 rounded-full object-cover border-2 border-slate-700 mb-3" />
+                                <div>
+                                    <p className="font-medium text-slate-200">{member.name}</p>
+                                    <p className="text-xs text-slate-500 uppercase tracking-wide mt-1">{member.role}</p>
                                 </div>
-                                <h3 className="font-bold text-lg leading-tight text-slate-200 group-hover:text-blue-400 transition-colors">{member.name}</h3>
-                                <p className="text-[10px] font-bold tracking-widest text-slate-500 uppercase mt-2">{member.role}</p>
                             </div>
                         ))}
                     </div>
                 </div>
-
             </main>
-        </div >
+        </div>
     );
 }
