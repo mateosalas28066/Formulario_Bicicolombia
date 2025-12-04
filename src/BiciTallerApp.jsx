@@ -268,7 +268,6 @@ export default function BiciAgenda() {
                         {step === 1 && (
                             <div className="space-y-6 animate-fade-in">
                                 <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
-                                    <Bike className="text-blue-500" />
                                     Selecciona tus Servicios
                                 </h2>
 
@@ -360,24 +359,18 @@ export default function BiciAgenda() {
                                                     className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                                                 />
                                             </div>
-                                            <div className="min-w-0 w-full overflow-hidden">
+                                            <div>
                                                 <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Hora</label>
-                                                {/* Horizontal Scroll Time Picker */}
-                                                <div className="flex gap-2 overflow-x-auto pb-2 snap-x w-full no-scrollbar">
-                                                    {TIME_SLOTS.map(slot => (
-                                                        <button
-                                                            key={slot}
-                                                            type="button"
-                                                            onClick={() => handleTimeSelect(slot)}
-                                                            className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all border snap-start whitespace-nowrap ${formData.time === slot
-                                                                ? 'bg-blue-600 text-white border-blue-500 shadow-[0_0_15px_rgba(37,99,235,0.5)]'
-                                                                : 'bg-transparent text-slate-400 border-slate-700 hover:bg-blue-500/10 hover:border-blue-500 hover:text-blue-400'
-                                                                }`}
-                                                        >
-                                                            {slot}
-                                                        </button>
-                                                    ))}
-                                                </div>
+                                                <input
+                                                    required
+                                                    type="time"
+                                                    name="time"
+                                                    min="09:00"
+                                                    max="19:00"
+                                                    value={formData.time}
+                                                    onChange={handleInputChange}
+                                                    className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                                                />
                                             </div>
                                         </div>
 
@@ -528,13 +521,27 @@ export default function BiciAgenda() {
                                     loop
                                     poster="https://images.unsplash.com/photo-1571068316344-75bc76f77890?auto=format&fit=crop&q=80&w=800"
                                 />
-                                <div className="absolute top-2 right-2 bg-red-600 text-white text-[10px] font-bold px-2 py-1 rounded flex items-center gap-1 animate-pulse">
-                                    <Video size={10} /> LIVE
-                                </div>
                             </div>
                             <div className="p-4">
-                                <h3 className="font-bold text-white mb-1">Taller en Vivo</h3>
-                                <p className="text-xs text-slate-400">Mira cómo trabajamos en tu bicicleta en tiempo real.</p>
+                                {selectedServices.length > 0 ? (
+                                    <>
+                                        <h3 className="font-bold text-white mb-1">{selectedServices[selectedServices.length - 1].name}</h3>
+                                        <p className="text-xs text-slate-400 mb-2">{selectedServices[selectedServices.length - 1].description}</p>
+                                        <div className="flex items-center gap-2 text-xs">
+                                            <span className="text-slate-500">Tiempo estimado:</span>
+                                            {selectedServices[selectedServices.length - 1].express ? (
+                                                <span className="text-amber-400 font-bold flex items-center gap-1"><Clock size={10} /> Express</span>
+                                            ) : (
+                                                <span className="text-slate-300 font-medium">24 Horas</span>
+                                            )}
+                                        </div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <h3 className="font-bold text-white mb-1">Nuestros Servicios</h3>
+                                        <p className="text-xs text-slate-400">Selecciona un servicio para ver los detalles.</p>
+                                    </>
+                                )}
                             </div>
                         </div>
 
