@@ -286,10 +286,10 @@ export default function Dashboard() {
             return [entryEvent, exitEvent];
         });
 
-    if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white">Cargando...</div>;
+    if (loading) return <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center text-slate-900 dark:text-white transition-colors duration-300">Cargando...</div>;
 
     return (
-        <div className="min-h-screen bg-slate-950 text-slate-200 flex flex-col font-sans">
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-200 flex flex-col font-sans transition-colors duration-300">
             <style>{`
                 /* Custom Scrollbar */
                 .custom-scrollbar::-webkit-scrollbar {
@@ -297,21 +297,34 @@ export default function Dashboard() {
                     width: 8px;
                 }
                 .custom-scrollbar::-webkit-scrollbar-track {
+                    background: #f1f5f9;
+                }
+                .dark .custom-scrollbar::-webkit-scrollbar-track {
                     background: #0f172a;
                 }
                 .custom-scrollbar::-webkit-scrollbar-thumb {
-                    background: #334155;
+                    background: #cbd5e1;
                     border-radius: 4px;
                 }
+                .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+                    background: #334155;
+                }
                 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+                    background: #94a3b8;
+                }
+                .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
                     background: #475569;
                 }
 
                 /* Calendar Spotlight Effect */
                 .rbc-time-view .rbc-day-slot.rbc-today {
-                    background: linear-gradient(180deg, rgba(37, 99, 235, 0.15) 0%, rgba(15, 23, 42, 0) 100%) !important;
+                    background: linear-gradient(180deg, rgba(37, 99, 235, 0.1) 0%, rgba(255, 255, 255, 0) 100%) !important;
                     background-color: transparent !important;
                 }
+                .dark .rbc-time-view .rbc-day-slot.rbc-today {
+                    background: linear-gradient(180deg, rgba(37, 99, 235, 0.15) 0%, rgba(15, 23, 42, 0) 100%) !important;
+                }
+
                 .rbc-time-view .rbc-day-bg.rbc-today {
                     background: transparent !important;
                     background-color: transparent !important;
@@ -321,18 +334,37 @@ export default function Dashboard() {
                     background-color: rgba(37, 99, 235, 0.1) !important;
                 }
                 .rbc-header.rbc-today a {
-                    color: #60a5fa !important; /* Light blue text for date */
+                    color: #2563eb !important; /* Blue text for date */
                     font-weight: bold;
+                }
+                .dark .rbc-header.rbc-today a {
+                    color: #60a5fa !important; /* Light blue text for date */
+                }
+                
+                /* Calendar Text Colors */
+                .rbc-toolbar button {
+                    color: #334155;
+                }
+                .dark .rbc-toolbar button {
+                    color: #cbd5e1;
+                }
+                .rbc-toolbar button:active, .rbc-toolbar button.rbc-active {
+                    background-color: #e2e8f0;
+                    color: #0f172a;
+                }
+                .dark .rbc-toolbar button:active, .dark .rbc-toolbar button.rbc-active {
+                    background-color: #334155;
+                    color: #fff;
                 }
             `}</style>
 
             {/* --- HEADER --- */}
-            <header className="bg-slate-900/90 backdrop-blur-md border-b border-slate-800 p-4 flex justify-between items-center sticky top-0 z-50 shadow-md">
+            <header className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 p-4 flex justify-between items-center sticky top-0 z-50 shadow-md transition-colors duration-300">
                 <div className="flex items-center gap-3">
                     <div className="bg-blue-600 p-2 rounded-lg shadow-lg shadow-blue-500/20">
                         <span className="font-bold text-white text-xl tracking-tighter">BICICOLOMBIA</span>
                     </div>
-                    <span className="text-slate-400 text-sm hidden sm:inline">Panel de Administración</span>
+                    <span className="text-slate-500 dark:text-slate-400 text-sm hidden sm:inline">Panel de Administración</span>
                 </div>
                 <div className="flex items-center gap-4">
                     <button
@@ -344,7 +376,7 @@ export default function Dashboard() {
                     </button>
                     <button
                         onClick={handleLogout}
-                        className="flex items-center gap-2 text-slate-400 hover:text-red-400 transition-colors text-sm font-medium"
+                        className="flex items-center gap-2 text-slate-500 dark:text-slate-400 hover:text-red-500 dark:hover:text-red-400 transition-colors text-sm font-medium"
                     >
                         <LogOut size={16} /> <span className="hidden sm:inline">Salir</span>
                     </button>
@@ -355,11 +387,11 @@ export default function Dashboard() {
             <main className="flex-1 flex flex-col overflow-hidden">
 
                 {/* --- TOP PANEL: RECENT REQUESTS (Horizontal Slider) --- */}
-                <div className="bg-slate-900/50 border-b border-slate-800 p-8 flex-shrink-0 backdrop-blur-sm">
-                    <h2 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+                <div className="bg-white/50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-800 p-8 flex-shrink-0 backdrop-blur-sm transition-colors duration-300">
+                    <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
                         <Clock className="text-blue-500" size={20} />
                         Solicitudes Recientes
-                        <span className="bg-slate-700 text-white text-xs px-2 py-0.5 rounded-full">{recentAppointments.length}</span>
+                        <span className="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-white text-xs px-2 py-0.5 rounded-full">{recentAppointments.length}</span>
                     </h2>
 
                     {recentAppointments.length === 0 ? (
@@ -367,16 +399,16 @@ export default function Dashboard() {
                     ) : (
                         <div className="flex gap-6 overflow-x-auto pb-6 custom-scrollbar snap-x">
                             {recentAppointments.map((app) => (
-                                <div key={app.id} className={`min-w-[340px] rounded-xl p-6 border shadow-lg relative group transition-all snap-start flex-shrink-0 bg-slate-900 border-slate-800 hover:border-slate-700`}>
+                                <div key={app.id} className={`min-w-[340px] rounded-xl p-6 border shadow-lg relative group transition-all snap-start flex-shrink-0 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700`}>
                                     <div className="flex justify-between items-start mb-4">
                                         <div>
-                                            <h3 className="font-bold text-white truncate w-48 capitalize text-lg" title={app.client_name}>{capitalizeName(app.client_name)}</h3>
-                                            <p className="text-xs text-slate-400 flex items-center gap-1 mt-1"><Phone size={12} /> {app.client_phone}</p>
+                                            <h3 className="font-bold text-slate-900 dark:text-white truncate w-48 capitalize text-lg" title={app.client_name}>{capitalizeName(app.client_name)}</h3>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-1"><Phone size={12} /> {app.client_phone}</p>
                                         </div>
-                                        <span className={`text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider ${app.status === 'pending' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
-                                            app.status === 'confirmed' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' :
-                                                app.status === 'completed' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
-                                                    'bg-red-500/20 text-red-400 border border-red-500/30'
+                                        <span className={`text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider ${app.status === 'pending' ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30' :
+                                            app.status === 'confirmed' ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-500/30' :
+                                                app.status === 'completed' ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30' :
+                                                    'bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-500/30'
                                             }`}>
                                             {app.status === 'pending' ? 'Pendiente' :
                                                 app.status === 'confirmed' ? 'Confirmada' :
@@ -384,8 +416,8 @@ export default function Dashboard() {
                                         </span>
                                     </div>
 
-                                    <div className="bg-slate-950 p-3 rounded-lg mb-4 text-sm border border-slate-800/50">
-                                        <p className="text-slate-300 font-medium truncate" title={app.service_name}>{app.service_name}</p>
+                                    <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-lg mb-4 text-sm border border-slate-200 dark:border-slate-800/50 transition-colors duration-300">
+                                        <p className="text-slate-700 dark:text-slate-300 font-medium truncate" title={app.service_name}>{app.service_name}</p>
                                         <div className="flex justify-between mt-2 text-xs text-slate-500 font-medium">
                                             <span>{app.appointment_date}</span>
                                             <span>{app.appointment_time}</span>
@@ -411,14 +443,14 @@ export default function Dashboard() {
                                                         setNewDate(app.appointment_date);
                                                         setNewTime(app.appointment_time);
                                                     }}
-                                                    className="w-10 h-10 rounded-full flex items-center justify-center transition-all text-slate-400 hover:bg-slate-800 hover:text-white hover:scale-105 active:scale-95"
+                                                    className="w-10 h-10 rounded-full flex items-center justify-center transition-all text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white hover:scale-105 active:scale-95"
                                                     title="Editar Cita"
                                                 >
                                                     <Edit size={18} />
                                                 </button>
                                                 <button
                                                     onClick={() => setShowConfirmModal({ type: 'cancel', id: app.id })}
-                                                    className="w-10 h-10 rounded-full flex items-center justify-center transition-all text-slate-400 hover:bg-red-900/20 hover:text-red-400 hover:scale-105 active:scale-95"
+                                                    className="w-10 h-10 rounded-full flex items-center justify-center transition-all text-slate-400 hover:bg-red-100 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 hover:scale-105 active:scale-95"
                                                     title="Cancelar Cita"
                                                 >
                                                     <Trash2 size={18} />
@@ -433,8 +465,8 @@ export default function Dashboard() {
                 </div>
 
                 {/* --- BOTTOM PANEL: CALENDAR OR LIST (Mobile) --- */}
-                <div className="flex-1 p-8 bg-slate-950 overflow-hidden flex flex-col">
-                    <h2 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+                <div className="flex-1 p-8 bg-slate-50 dark:bg-slate-950 overflow-hidden flex flex-col transition-colors duration-300">
+                    <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
                         <Calendar className="text-emerald-500" size={20} />
                         {isMobile ? 'Agenda del Día' : 'Agenda Confirmada'}
                     </h2>
@@ -452,17 +484,17 @@ export default function Dashboard() {
                                 })
                                 .sort((a, b) => a.start - b.start)
                                 .map((evt, idx) => (
-                                    <div key={idx} className={`p-5 rounded-xl border ${evt.type === 'entry' ? 'bg-emerald-900/10 border-emerald-500/30' : 'bg-purple-900/10 border-purple-500/30'}`}>
+                                    <div key={idx} className={`p-5 rounded-xl border ${evt.type === 'entry' ? 'bg-emerald-50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-500/30' : 'bg-purple-50 dark:bg-purple-900/10 border-purple-200 dark:border-purple-500/30'}`}>
                                         <div className="flex justify-between items-start">
                                             <div>
-                                                <p className={`text-xs font-bold uppercase tracking-wider mb-2 ${evt.type === 'entry' ? 'text-emerald-400' : 'text-purple-400'}`}>
+                                                <p className={`text-xs font-bold uppercase tracking-wider mb-2 ${evt.type === 'entry' ? 'text-emerald-600 dark:text-emerald-400' : 'text-purple-600 dark:text-purple-400'}`}>
                                                     {evt.type === 'entry' ? 'Entrada Taller' : 'Entrega Estimada'}
                                                 </p>
-                                                <h3 className="font-bold text-slate-200 text-lg">{evt.title.replace('Entrada: ', '').replace('Entrega: ', '')}</h3>
-                                                <p className="text-sm text-slate-400 mt-1">{evt.details}</p>
+                                                <h3 className="font-bold text-slate-900 dark:text-slate-200 text-lg">{evt.title.replace('Entrada: ', '').replace('Entrega: ', '')}</h3>
+                                                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{evt.details}</p>
                                             </div>
                                             <div className="text-right">
-                                                <p className="text-xl font-bold text-white">{format(evt.start, 'HH:mm')}</p>
+                                                <p className="text-xl font-bold text-slate-900 dark:text-white">{format(evt.start, 'HH:mm')}</p>
                                                 <p className="text-xs text-slate-500 font-medium uppercase mt-1">{format(evt.start, 'dd MMM')}</p>
                                             </div>
                                         </div>
@@ -472,7 +504,7 @@ export default function Dashboard() {
                         </div>
                     ) : (
                         // Desktop Calendar View
-                        <div className="flex-1 bg-slate-900 rounded-xl border border-slate-800 p-6 shadow-inner text-slate-300">
+                        <div className="flex-1 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6 shadow-inner text-slate-700 dark:text-slate-300 transition-colors duration-300">
                             <BigCalendar
                                 localizer={localizer}
                                 events={events}
@@ -524,12 +556,12 @@ export default function Dashboard() {
             {/* NEW APPOINTMENT MODAL */}
             {showNewAppointmentModal && (
                 <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 max-w-2xl w-full shadow-2xl animate-fade-in-up max-h-[90vh] overflow-y-auto custom-scrollbar">
+                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-8 max-w-2xl w-full shadow-2xl animate-fade-in-up max-h-[90vh] overflow-y-auto custom-scrollbar transition-colors duration-300">
                         <div className="flex justify-between items-center mb-8">
-                            <h3 className="text-2xl font-bold text-white flex items-center gap-3">
+                            <h3 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
                                 <Plus className="text-blue-500" /> Nueva Cita (Físico)
                             </h3>
-                            <button onClick={() => setShowNewAppointmentModal(false)} className="text-slate-500 hover:text-white transition-colors">
+                            <button onClick={() => setShowNewAppointmentModal(false)} className="text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors">
                                 <X size={24} />
                             </button>
                         </div>
@@ -537,34 +569,34 @@ export default function Dashboard() {
                         <form onSubmit={handleCreateAppointment} className="space-y-6">
                             <div className="grid grid-cols-2 gap-6">
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Nombre Cliente</label>
+                                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Nombre Cliente</label>
                                     <input
                                         required
                                         type="text"
                                         value={newApp.name}
                                         onChange={(e) => setNewApp({ ...newApp, name: e.target.value })}
-                                        className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                        className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Teléfono</label>
+                                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Teléfono</label>
                                     <input
                                         required
                                         type="tel"
                                         value={newApp.phone}
                                         onChange={(e) => setNewApp({ ...newApp, phone: e.target.value })}
-                                        className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                        className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                                     />
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-3 gap-6">
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Tipo Bici</label>
+                                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Tipo Bici</label>
                                     <select
                                         value={newApp.bikeType}
                                         onChange={(e) => setNewApp({ ...newApp, bikeType: e.target.value })}
-                                        className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                        className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                                     >
                                         <option value="MTB">MTB</option>
                                         <option value="Ruta">Ruta</option>
@@ -573,30 +605,30 @@ export default function Dashboard() {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Fecha</label>
+                                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Fecha</label>
                                     <input
                                         required
                                         type="date"
                                         value={newApp.date}
                                         onChange={(e) => setNewApp({ ...newApp, date: e.target.value })}
-                                        className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                        className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Hora</label>
+                                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Hora</label>
                                     <input
                                         required
                                         type="time"
                                         value={newApp.time}
                                         onChange={(e) => setNewApp({ ...newApp, time: e.target.value })}
-                                        className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                        className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                                     />
                                 </div>
                             </div>
 
                             <div>
-                                <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Servicios ({newApp.selectedServices.length})</label>
-                                <div className="bg-slate-950 border border-slate-800 rounded-lg p-4 max-h-48 overflow-y-auto custom-scrollbar space-y-2">
+                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Servicios ({newApp.selectedServices.length})</label>
+                                <div className="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg p-4 max-h-48 overflow-y-auto custom-scrollbar space-y-2">
                                     {SERVICE_DATA.map((cat, idx) => (
                                         <div key={idx}>
                                             <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">{cat.category}</p>
@@ -606,7 +638,7 @@ export default function Dashboard() {
                                                     <div
                                                         key={service.id}
                                                         onClick={() => handleNewAppServiceSelect(service)}
-                                                        className={`flex items-center justify-between p-3 rounded-lg cursor-pointer text-sm transition-all ${isSelected ? 'bg-blue-900/30 text-blue-400 ring-1 ring-blue-500/50' : 'hover:bg-slate-900 text-slate-300'}`}
+                                                        className={`flex items-center justify-between p-3 rounded-lg cursor-pointer text-sm transition-all ${isSelected ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 ring-1 ring-blue-500/50' : 'hover:bg-slate-100 dark:hover:bg-slate-900 text-slate-700 dark:text-slate-300'}`}
                                                     >
                                                         <span>{service.name}</span>
                                                         {isSelected && <CheckCircle size={16} />}
@@ -619,12 +651,12 @@ export default function Dashboard() {
                             </div>
 
                             <div>
-                                <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Notas</label>
+                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Notas</label>
                                 <textarea
                                     rows="2"
                                     value={newApp.comments}
                                     onChange={(e) => setNewApp({ ...newApp, comments: e.target.value })}
-                                    className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none resize-none transition-all"
+                                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none resize-none transition-all"
                                 ></textarea>
                             </div>
 
@@ -642,14 +674,14 @@ export default function Dashboard() {
             {/* CONFIRMATION MODAL */}
             {showConfirmModal && (
                 <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 max-w-sm w-full shadow-2xl animate-fade-in-up">
+                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-8 max-w-sm w-full shadow-2xl animate-fade-in-up transition-colors duration-300">
                         <div className="flex justify-center mb-6 text-amber-500">
                             <AlertTriangle size={56} />
                         </div>
-                        <h3 className="text-2xl font-bold text-white text-center mb-3">
+                        <h3 className="text-2xl font-bold text-slate-900 dark:text-white text-center mb-3">
                             ¿Estás seguro?
                         </h3>
-                        <p className="text-slate-400 text-center mb-8 text-sm leading-relaxed">
+                        <p className="text-slate-600 dark:text-slate-400 text-center mb-8 text-sm leading-relaxed">
                             {showConfirmModal.type === 'accept'
                                 ? "Vas a confirmar esta cita. Se enviará una notificación al cliente."
                                 : "Vas a cancelar esta cita. Esta acción no se puede deshacer."}
@@ -657,7 +689,7 @@ export default function Dashboard() {
                         <div className="flex gap-4">
                             <button
                                 onClick={() => setShowConfirmModal(null)}
-                                className="flex-1 py-3 rounded-lg border border-slate-700 text-slate-300 font-medium hover:bg-slate-800 transition-colors"
+                                className="flex-1 py-3 rounded-lg border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                             >
                                 Volver
                             </button>
@@ -676,28 +708,28 @@ export default function Dashboard() {
             {/* RESCHEDULE MODAL */}
             {showRescheduleModal && (
                 <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 max-w-sm w-full shadow-2xl animate-fade-in-up">
+                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-8 max-w-sm w-full shadow-2xl animate-fade-in-up transition-colors duration-300">
                         <div className="flex justify-between items-center mb-8">
-                            <h3 className="text-xl font-bold text-white">Reprogramar Cita</h3>
-                            <button onClick={() => setShowRescheduleModal(null)} className="text-slate-500 hover:text-white transition-colors">
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">Reprogramar Cita</h3>
+                            <button onClick={() => setShowRescheduleModal(null)} className="text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors">
                                 <X size={24} />
                             </button>
                         </div>
 
                         <form onSubmit={handleReschedule} className="space-y-6">
                             <div>
-                                <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Nueva Fecha</label>
+                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Nueva Fecha</label>
                                 <input
                                     required
                                     type="date"
                                     min={new Date().toISOString().split('T')[0]}
                                     value={newDate}
                                     onChange={(e) => setNewDate(e.target.value)}
-                                    className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Nueva Hora</label>
+                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Nueva Hora</label>
                                 <input
                                     required
                                     type="time"
@@ -705,7 +737,7 @@ export default function Dashboard() {
                                     max="19:00"
                                     value={newTime}
                                     onChange={(e) => setNewTime(e.target.value)}
-                                    className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                                 />
                             </div>
                             <button

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Bicicolombia Form
  * Description: Embeds the Bicicolombia React Form.
- * Version: 1.6
+ * Version: 1.7
  * Author: Bicicolombia
  */
 
@@ -26,7 +26,7 @@ function bicicolombia_form_enqueue() {
             'bicicolombia-form-js', 
             $plugin_dir_url . 'dist/assets/' . $js_file, 
             array(), 
-            '1.6', 
+            '1.7', 
             true 
         );
     }
@@ -39,7 +39,7 @@ function bicicolombia_form_enqueue() {
             'bicicolombia-form-css', 
             $plugin_dir_url . 'dist/assets/' . $css_file, 
             array(), 
-            '1.6' 
+            '1.7' 
         );
     }
 }

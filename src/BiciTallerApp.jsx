@@ -8,6 +8,7 @@ import {
     Video,
     MessageCircle,
     ChevronRight,
+    ChevronDown,
     MapPin,
     Info,
     Bike
@@ -215,7 +216,7 @@ export default function BiciAgenda() {
     };
 
     return (
-        <div className="min-h-screen bg-slate-950 font-sans text-slate-200">
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-200 transition-colors duration-300">
             <style>{`
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(-10px); }
@@ -237,13 +238,22 @@ export default function BiciAgenda() {
           height: 8px;
         }
         ::-webkit-scrollbar-track {
+          background: #f1f5f9;
+        }
+        .dark ::-webkit-scrollbar-track {
           background: #0f172a;
         }
         ::-webkit-scrollbar-thumb {
-          background: #334155;
+          background: #cbd5e1;
           border-radius: 4px;
         }
+        .dark ::-webkit-scrollbar-thumb {
+          background: #334155;
+        }
         ::-webkit-scrollbar-thumb:hover {
+          background: #94a3b8;
+        }
+        .dark ::-webkit-scrollbar-thumb:hover {
           background: #475569;
         }
 
@@ -267,41 +277,41 @@ export default function BiciAgenda() {
                         {/* --- STEP 1: SERVICE SELECTION --- */}
                         {step === 1 && (
                             <div className="space-y-6 animate-fade-in">
-                                <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+                                <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
                                     Selecciona tus Servicios
                                 </h2>
 
                                 {SERVICE_DATA.map((category, idx) => (
-                                    <div key={idx} className="bg-slate-900 rounded-xl shadow-lg border border-slate-800 overflow-hidden">
-                                        <div className="bg-slate-800/50 px-4 py-3 font-bold text-slate-300 border-b border-slate-700/50 uppercase text-xs tracking-wider">
+                                    <div key={idx} className="bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-slate-200 dark:border-slate-800 overflow-hidden transition-colors duration-300">
+                                        <div className="bg-slate-100 dark:bg-slate-800/50 px-4 py-3 font-bold text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700/50 uppercase text-xs tracking-wider transition-colors duration-300">
                                             {category.category}
                                         </div>
-                                        <div className="divide-y divide-slate-800">
+                                        <div className="divide-y divide-slate-100 dark:divide-slate-800">
                                             {category.items.map((service) => {
                                                 const isSelected = selectedServices.some(s => s.id === service.id);
                                                 return (
                                                     <div
                                                         key={service.id}
                                                         onClick={() => handleServiceSelect(service)}
-                                                        className={`p-4 cursor-pointer transition-all hover:bg-slate-800/50 flex items-center justify-between group ${isSelected ? 'bg-blue-900/20' : ''}`}
+                                                        className={`p-4 cursor-pointer transition-all hover:bg-slate-50 dark:hover:bg-slate-800/50 flex items-center justify-between group ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}
                                                     >
                                                         <div className="flex items-center gap-4">
-                                                            <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${isSelected ? 'bg-blue-500 border-blue-500' : 'border-slate-600 group-hover:border-blue-400'}`}>
+                                                            <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${isSelected ? 'bg-blue-500 border-blue-500' : 'border-slate-300 dark:border-slate-600 group-hover:border-blue-400'}`}>
                                                                 {isSelected && <CheckCircle size={14} className="text-white" />}
                                                             </div>
                                                             <div>
-                                                                <p className={`font-medium transition-colors ${isSelected ? 'text-blue-400' : 'text-slate-200 group-hover:text-white'}`}>{service.name}</p>
+                                                                <p className={`font-medium transition-colors ${isSelected ? 'text-blue-600 dark:text-blue-400' : 'text-slate-700 dark:text-slate-200 group-hover:text-slate-900 dark:group-hover:text-white'}`}>{service.name}</p>
                                                                 <p className="text-xs text-slate-500">{service.description}</p>
                                                             </div>
                                                         </div>
                                                         <div className="text-right">
-                                                            <p className="font-bold text-emerald-400">{formatPrice(service.price)}</p>
+                                                            <p className="font-bold text-emerald-600 dark:text-emerald-400">{formatPrice(service.price)}</p>
                                                             {service.express ? (
-                                                                <span className="text-[10px] bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full font-bold uppercase tracking-wide border border-amber-500/30 flex items-center gap-1 justify-end mt-1">
+                                                                <span className="text-[10px] bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full font-bold uppercase tracking-wide border border-amber-200 dark:border-amber-500/30 flex items-center gap-1 justify-end mt-1">
                                                                     <Clock size={10} /> Express
                                                                 </span>
                                                             ) : (
-                                                                <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full font-medium border border-slate-700 mt-1 inline-block">
+                                                                <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-2 py-0.5 rounded-full font-medium border border-slate-200 dark:border-slate-700 mt-1 inline-block">
                                                                     24h
                                                                 </span>
                                                             )}
@@ -320,27 +330,27 @@ export default function BiciAgenda() {
                             <div className="animate-fade-in">
                                 <button
                                     onClick={() => setStep(1)}
-                                    className="mb-6 text-sm text-slate-500 hover:text-blue-400 flex items-center gap-2 transition-colors"
+                                    className="mb-6 text-sm text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-2 transition-colors"
                                 >
                                     ← Volver a servicios
                                 </button>
 
-                                <div className="bg-slate-900 rounded-xl shadow-xl border border-slate-800 p-6 md:p-10">
-                                    <h2 className="text-2xl font-bold text-white mb-8">Agenda tu cita</h2>
+                                <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-800 p-6 md:p-10 transition-colors duration-300">
+                                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-8">Agenda tu cita</h2>
 
-                                    <div className="bg-slate-800/50 p-4 rounded-lg mb-8 border border-slate-700">
+                                    <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-lg mb-8 border border-slate-200 dark:border-slate-700 transition-colors duration-300">
                                         <div className="flex items-center gap-4 mb-3">
-                                            <div className="bg-slate-700 p-3 rounded-full text-blue-400">
+                                            <div className="bg-slate-200 dark:bg-slate-700 p-3 rounded-full text-blue-600 dark:text-blue-400">
                                                 <Wrench size={20} />
                                             </div>
                                             <div>
-                                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Servicios seleccionados ({selectedServices.length})</p>
-                                                <p className="text-sm font-bold text-emerald-400">{formatPrice(getTotalPrice())}</p>
+                                                <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">Servicios seleccionados ({selectedServices.length})</p>
+                                                <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">{formatPrice(getTotalPrice())}</p>
                                             </div>
                                         </div>
                                         <ul className="space-y-1 pl-14">
                                             {selectedServices.map(s => (
-                                                <li key={s.id} className="text-sm text-slate-300 list-disc list-inside">{s.name}</li>
+                                                <li key={s.id} className="text-sm text-slate-600 dark:text-slate-300 list-disc list-inside">{s.name}</li>
                                             ))}
                                         </ul>
                                     </div>
@@ -348,7 +358,7 @@ export default function BiciAgenda() {
                                     <form onSubmit={handleSubmit} className="space-y-6">
                                         <div className="grid md:grid-cols-2 gap-6">
                                             <div>
-                                                <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Fecha</label>
+                                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Fecha</label>
                                                 <input
                                                     required
                                                     type="date"
@@ -356,11 +366,11 @@ export default function BiciAgenda() {
                                                     min={new Date().toISOString().split('T')[0]}
                                                     value={formData.date}
                                                     onChange={handleInputChange}
-                                                    className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                                                    className="w-full px-4 py-3 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Hora</label>
+                                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Hora</label>
                                                 <input
                                                     required
                                                     type="time"
@@ -369,148 +379,85 @@ export default function BiciAgenda() {
                                                     max="19:00"
                                                     value={formData.time}
                                                     onChange={handleInputChange}
-                                                    className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                                                    className="w-full px-4 py-3 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                                                 />
                                             </div>
                                         </div>
 
                                         <div className="grid md:grid-cols-2 gap-6">
                                             <div>
-                                                <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Nombre Completo</label>
+                                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Nombre Completo</label>
                                                 <input
                                                     required
                                                     type="text"
                                                     name="name"
-                                                    placeholder="Ej: Juan Pérez"
                                                     value={formData.name}
                                                     onChange={handleInputChange}
-                                                    className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                                                    placeholder="Tu nombre"
+                                                    className="w-full px-4 py-3 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Teléfono</label>
+                                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Teléfono</label>
                                                 <input
                                                     required
                                                     type="tel"
                                                     name="phone"
-                                                    placeholder="Ej: 300 123 4567"
                                                     value={formData.phone}
                                                     onChange={handleInputChange}
-                                                    className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                                                    placeholder="Tu teléfono"
+                                                    className="w-full px-4 py-3 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                                                 />
                                             </div>
                                         </div>
 
                                         <div>
-                                            <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Tipo de Bicicleta</label>
-                                            <select
-                                                name="bikeType"
-                                                value={formData.bikeType}
-                                                onChange={handleInputChange}
-                                                className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-                                            >
-                                                <option value="MTB">MTB (Montaña)</option>
-                                                <option value="Ruta">Ruta</option>
-                                                <option value="Urbana">Urbana</option>
-                                                <option value="Eléctrica">Eléctrica</option>
-                                                <option value="Infantil">Infantil</option>
-                                            </select>
+                                            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Tipo de Bicicleta</label>
+                                            <div className="relative">
+                                                <select
+                                                    name="bikeType"
+                                                    value={formData.bikeType}
+                                                    onChange={handleInputChange}
+                                                    className="w-full px-4 py-3 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all appearance-none"
+                                                >
+                                                    <option value="MTB">MTB (Montaña)</option>
+                                                    <option value="Ruta">Ruta</option>
+                                                    <option value="Urbana">Urbana</option>
+                                                    <option value="Eléctrica">Eléctrica</option>
+                                                    <option value="Infantil">Infantil</option>
+                                                </select>
+                                                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" size={20} />
+                                            </div>
                                         </div>
 
                                         <div>
-                                            <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Comentarios Adicionales</label>
+                                            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Comentarios Adicionales</label>
                                             <textarea
                                                 name="comments"
-                                                rows="3"
-                                                placeholder="Detalles adicionales sobre el servicio..."
                                                 value={formData.comments}
                                                 onChange={handleInputChange}
-                                                className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-lg text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all resize-none"
+                                                rows="3"
+                                                placeholder="¿Algo más que debamos saber?"
+                                                className="w-full px-4 py-3 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all resize-none"
                                             ></textarea>
                                         </div>
 
                                         <button
                                             type="submit"
-                                            className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-500/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                                            className="w-full bg-blue-600 hover:bg-blue-500 text-white py-4 rounded-xl font-bold text-lg shadow-lg shadow-blue-500/20 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2"
                                         >
                                             Confirmar Cita
+                                            <CheckCircle size={20} />
                                         </button>
                                     </form>
                                 </div>
                             </div>
                         )}
-
-                        {/* --- STEP 3: CONFIRMATION --- */}
-                        {step === 3 && (
-                            <div className="animate-fade-in text-center py-10">
-                                <div className="bg-green-500/10 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
-                                    <CheckCircle className="text-green-500 w-10 h-10" />
-                                </div>
-                                <h2 className="text-3xl font-bold text-white mb-4">¡Cita Agendada!</h2>
-                                <p className="text-slate-400 mb-8 max-w-md mx-auto">
-                                    Tu cita ha sido registrada exitosamente. Te hemos enviado un correo con los detalles.
-                                </p>
-
-                                <div className="bg-slate-900 p-6 rounded-xl border border-slate-800 max-w-md mx-auto mb-8 text-left">
-                                    <h3 className="text-lg font-bold text-white mb-4 border-b border-slate-800 pb-2">Resumen</h3>
-                                    <div className="space-y-3 text-sm">
-                                        <div className="flex justify-between">
-                                            <span className="text-slate-400">Servicio:</span>
-                                            <span className="text-slate-200 font-medium">{getServiceNames()}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-slate-400">Fecha:</span>
-                                            <span className="text-slate-200 font-medium">{formData.date}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-slate-400">Hora:</span>
-                                            <span className="text-slate-200 font-medium">{formData.time}</span>
-                                        </div>
-                                        <div className="flex justify-between pt-2 border-t border-slate-800">
-                                            <span className="text-slate-400">Total:</span>
-                                            <span className="text-emerald-400 font-bold">{formatPrice(getTotalPrice())}</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                                    <a
-                                        href={generateCalendarLink()}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="bg-slate-800 hover:bg-slate-700 text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
-                                    >
-                                        <Calendar size={18} />
-                                        Agregar a Google Calendar
-                                    </a>
-                                    <button
-                                        onClick={() => {
-                                            setStep(1);
-                                            setFormData(prev => ({
-                                                ...prev,
-                                                name: '',
-                                                phone: '',
-                                                email: '',
-                                                bikeType: 'MTB',
-                                                comments: ''
-                                            }));
-                                            setSelectedServices([]);
-                                        }}
-                                        className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-lg font-medium transition-colors"
-                                    >
-                                        Agendar Nueva Cita
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-
                     </div>
 
-                    {/* --- RIGHT COLUMN: INFO & VIDEO --- */}
+                    {/* --- RIGHT COLUMN: VIDEO & SUMMARY --- */}
                     <div className="space-y-6">
-
-                        {/* VIDEO CARD */}
-                        <div className="bg-slate-900 rounded-xl shadow-lg border border-slate-800 overflow-hidden">
+                        <div className="bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-slate-200 dark:border-slate-800 overflow-hidden transition-colors duration-300">
                             <div className="relative aspect-video bg-slate-950">
                                 <video
                                     ref={videoRef}
@@ -525,21 +472,21 @@ export default function BiciAgenda() {
                             <div className="p-4">
                                 {selectedServices.length > 0 ? (
                                     <>
-                                        <h3 className="font-bold text-white mb-1">{selectedServices[selectedServices.length - 1].name}</h3>
-                                        <p className="text-xs text-slate-400 mb-2">{selectedServices[selectedServices.length - 1].description}</p>
+                                        <h3 className="font-bold text-slate-900 dark:text-white mb-1">{selectedServices[selectedServices.length - 1].name}</h3>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">{selectedServices[selectedServices.length - 1].description}</p>
                                         <div className="flex items-center gap-2 text-xs">
                                             <span className="text-slate-500">Tiempo estimado:</span>
                                             {selectedServices[selectedServices.length - 1].express ? (
-                                                <span className="text-amber-400 font-bold flex items-center gap-1"><Clock size={10} /> Express</span>
+                                                <span className="text-amber-600 dark:text-amber-400 font-bold flex items-center gap-1"><Clock size={10} /> Express</span>
                                             ) : (
-                                                <span className="text-slate-300 font-medium">24 Horas</span>
+                                                <span className="text-slate-700 dark:text-slate-300 font-medium">24 Horas</span>
                                             )}
                                         </div>
                                     </>
                                 ) : (
                                     <>
-                                        <h3 className="font-bold text-white mb-1">Nuestros Servicios</h3>
-                                        <p className="text-xs text-slate-400">Selecciona un servicio para ver los detalles.</p>
+                                        <h3 className="font-bold text-slate-900 dark:text-white mb-1">Nuestros Servicios</h3>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400">Selecciona un servicio para ver los detalles.</p>
                                     </>
                                 )}
                             </div>
@@ -547,8 +494,8 @@ export default function BiciAgenda() {
 
                         {/* --- SELECTED SERVICES SUMMARY (Step 1 Only) --- */}
                         {step === 1 && (
-                            <div className="bg-slate-900 rounded-xl shadow-lg border border-slate-800 p-5 sticky top-4">
-                                <h3 className="font-bold text-white mb-4 flex items-center gap-2">
+                            <div className="bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-slate-200 dark:border-slate-800 p-5 sticky top-4 transition-colors duration-300">
+                                <h3 className="font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
                                     <Wrench size={16} className="text-blue-500" />
                                     Resumen
                                 </h3>
@@ -562,13 +509,13 @@ export default function BiciAgenda() {
                                         <div className="space-y-2">
                                             {selectedServices.map(s => (
                                                 <div key={s.id} className="flex justify-between text-sm">
-                                                    <span className="text-slate-300">{s.name}</span>
-                                                    <span className="text-emerald-400 font-medium">{formatPrice(s.price)}</span>
+                                                    <span className="text-slate-600 dark:text-slate-300">{s.name}</span>
+                                                    <span className="text-emerald-600 dark:text-emerald-400 font-medium">{formatPrice(s.price)}</span>
                                                 </div>
                                             ))}
-                                            <div className="border-t border-slate-800 pt-2 flex justify-between font-bold">
-                                                <span className="text-white">Total</span>
-                                                <span className="text-emerald-400">{formatPrice(getTotalPrice())}</span>
+                                            <div className="border-t border-slate-200 dark:border-slate-800 pt-2 flex justify-between font-bold">
+                                                <span className="text-slate-900 dark:text-white">Total</span>
+                                                <span className="text-emerald-600 dark:text-emerald-400">{formatPrice(getTotalPrice())}</span>
                                             </div>
                                         </div>
 
@@ -588,17 +535,17 @@ export default function BiciAgenda() {
                 </div>
 
                 {/* --- FOOTER: TEAM --- */}
-                <div className="mt-12 pt-8 border-t border-slate-800">
-                    <h3 className="font-bold text-white mb-6 flex items-center gap-2 text-xl">
+                <div className="mt-12 pt-8 border-t border-slate-200 dark:border-slate-800">
+                    <h3 className="font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2 text-xl">
                         <Info size={24} className="text-blue-500" />
                         Nuestro Equipo
                     </h3>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                         {TEAM_DATA.map((member, idx) => (
-                            <div key={idx} className="bg-slate-900 rounded-xl p-4 border border-slate-800 flex flex-col items-center text-center">
-                                <img src={member.image} alt={member.name} className="w-20 h-20 rounded-full object-cover border-2 border-slate-700 mb-3" />
+                            <div key={idx} className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-slate-200 dark:border-slate-800 flex flex-col items-center text-center transition-colors duration-300">
+                                <img src={member.image} alt={member.name} className="w-20 h-20 rounded-full object-cover border-2 border-slate-100 dark:border-slate-700 mb-3" />
                                 <div>
-                                    <p className="font-medium text-slate-200">{member.name}</p>
+                                    <p className="font-medium text-slate-900 dark:text-slate-200">{member.name}</p>
                                     <p className="text-xs text-slate-500 uppercase tracking-wide mt-1">{member.role}</p>
                                 </div>
                             </div>
