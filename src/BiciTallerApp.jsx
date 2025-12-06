@@ -209,13 +209,43 @@ export default function BiciAgenda() {
     };
 
     const generateCalendarLink = () => {
-        if (selectedServices.length === 0 || !formData.date || !formData.time) return '#';
+        if (!formData.date || !formData.time) return '#';
+
         const startTime = new Date(`${formData.date}T${formData.time}`);
         const endTime = new Date(startTime.getTime() + 60 * 60 * 1000);
         const formatTime = (date) => date.toISOString().replace(/-|:|\\.\\d\\d\\d/g, "");
-        const details = `Cliente: ${formData.name}\\nTel: ${formData.phone}\\nBici: ${formData.bikeType}\\nNota: ${formData.comments}`;
-        const title = `Cita Taller: ${getServiceNames()}`;
-        return `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${formatTime(startTime)}/${formatTime(endTime)}&details=${encodeURIComponent(details)}&location=Taller Bicicolombia`;
+
+        const isExpress = selectedServices.length > 0 && selectedServices.every(s => s.express);
+        const deliveryTime = new Date(startTime);
+        if (isExpress) {
+            deliveryTime.setHours(19, 0, 0, 0);
+        } else {
+            deliveryTime.setDate(deliveryTime.getDate() + 1);
+            deliveryTime.setHours(19, 0, 0, 0);
+        }
+
+        const arrivalHour = startTime.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+        const deliveryDateStr = deliveryTime.toLocaleDateString('es-CO');
+        const deliveryHour = deliveryTime.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+
+        const servicesList = selectedServices.length
+            ? selectedServices.map(s => `- ${s.name}`).join('\n')
+            : '- Servicio por definir';
+
+        const details = [
+            `Hola ${formData.name || ''} esta es tu cita en Bicicolombia.`,
+            'Cita de mantenimiento.',
+            `Servicios:\n${servicesList}`,
+            `Entrega estimada: ${deliveryDateStr} ${deliveryHour}`,
+            `Recuerda llevar tu bicicleta a las ${arrivalHour}.`,
+            `Tiempo aproximado: ${isExpress ? 'Express (mismo día)' : '24 horas'}.`,
+            'Contacto taller: 3332848000'
+        ].filter(Boolean).join('\n');
+
+        const title = 'Cita Taller Bicicolombia';
+        const location = 'Cl. 5 #43-40, Cali';
+
+        return `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${formatTime(startTime)}/${formatTime(endTime)}&details=${encodeURIComponent(details)}&location=${encodeURIComponent(location)}`;
     };
 
     const formatPrice = (price) => {
@@ -388,6 +418,7 @@ export default function BiciAgenda() {
                                                     onChange={handleInputChange}
                                                     className="w-full px-4 py-3 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                                                 />
+                                                <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">Horario: 9 a.m. a 7 p.m.</p>
                                             </div>
                                         </div>
 

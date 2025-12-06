@@ -621,8 +621,9 @@ export default function Dashboard() {
                                         type="time"
                                         value={newApp.time}
                                         onChange={(e) => setNewApp({ ...newApp, time: e.target.value })}
-                                        className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                        className="w-full px-4 py-3 h-12 pr-3 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-200 text-sm leading-tight focus:ring-2 focus:ring-blue-500 outline-none transition-all appearance-none"
                                     />
+                                    <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">Horario: 9 a.m. a 7 p.m.</p>
                                 </div>
                             </div>
 
@@ -739,6 +740,7 @@ export default function Dashboard() {
                                     onChange={(e) => setNewTime(e.target.value)}
                                     className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                                 />
+                                <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">Horario: 9 a.m. a 7 p.m.</p>
                             </div>
                             <button
                                 type="submit"
