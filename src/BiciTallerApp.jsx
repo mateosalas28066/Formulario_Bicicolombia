@@ -425,7 +425,7 @@ export default function BiciAgenda() {
                                                     name="bikeType"
                                                     value={formData.bikeType}
                                                     onChange={handleInputChange}
-                                                    className="w-full px-4 py-3 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all appearance-none"
+                                                    className="w-full px-4 py-3 pr-10 h-12 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-200 text-sm leading-tight focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all appearance-none"
                                                 >
                                                     <option value="MTB">MTB (Montaña)</option>
                                                     <option value="Ruta">Ruta</option>

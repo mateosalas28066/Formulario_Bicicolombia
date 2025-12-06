@@ -596,7 +596,7 @@ export default function Dashboard() {
                                     <select
                                         value={newApp.bikeType}
                                         onChange={(e) => setNewApp({ ...newApp, bikeType: e.target.value })}
-                                        className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                        className="w-full px-4 py-3 h-12 pr-3 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-200 text-sm leading-tight focus:ring-2 focus:ring-blue-500 outline-none transition-all appearance-none"
                                     >
                                         <option value="MTB">MTB</option>
                                         <option value="Ruta">Ruta</option>
