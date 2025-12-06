@@ -100,7 +100,7 @@ export default function Dashboard() {
 
         if (data) setAppointments(data);
         setLoading(false);
-        // Llevar el slider al inicio para mostrar la mбs reciente
+        // Llevar el slider al inicio para mostrar la más reciente
         requestAnimationFrame(() => {
             if (recentListRef.current) {
                 recentListRef.current.scrollTo({ left: 0, behavior: 'smooth' });
@@ -488,51 +488,34 @@ export default function Dashboard() {
                 }
             `}</style>
 
-            {/* --- HEADER --- */}
-            <header className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 p-4 flex justify-between items-center sticky top-0 z-50 shadow-md transition-colors duration-300">
-                <div className="flex items-center gap-3">
-                    <div className="bg-blue-600 p-2 rounded-lg shadow-lg shadow-blue-500/20">
-                        <span className="font-bold text-white text-xl tracking-tighter">BICICOLOMBIA</span>
-                    </div>
-                    <span className="text-slate-500 dark:text-slate-400 text-sm hidden sm:inline">Panel de Administración</span>
-                </div>
-                <div className="flex items-center gap-4">
-                    <button
-                        onClick={() => setShowNewAppointmentModal(true)}
-                        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors shadow-lg shadow-blue-600/20"
-                    >
-                        <Plus size={18} />
-                        <span className="hidden sm:inline">Nueva Cita</span>
-                    </button>
-                    <button
-                        onClick={handleLogout}
-                        className="flex items-center gap-2 text-slate-500 dark:text-slate-400 hover:text-red-500 dark:hover:text-red-400 transition-colors text-sm font-medium"
-                    >
-                        <LogOut size={16} /> <span className="hidden sm:inline">Salir</span>
-                    </button>
-                </div>
-            </header>
-
             {/* --- MAIN CONTENT --- */}
             <main className="flex-1 flex flex-col overflow-hidden">
 
                 {/* --- TOP PANEL: RECENT REQUESTS (Horizontal Slider) --- */}
                 <div className="bg-white/50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-800 p-8 flex-shrink-0 backdrop-blur-sm transition-colors duration-300">
-                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-                        <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                            <Clock className="text-blue-500" size={20} />
-                            Solicitudes Recientes
-                            <span className="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-white text-xs px-2 py-0.5 rounded-full">{recentAppointments.length}</span>
-                        </h2>
-                        <div className="flex flex-col md:flex-row gap-2 md:items-center">
-                            <input
-                                type="text"
-                                placeholder="Buscar por nombre o teléfono"
-                                value={searchTerm}
-                                onChange={(e) => { setSearchTerm(e.target.value); setListPage(0); }}
-                                className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm"
-                            />
-                            <div className="flex gap-2">
+                    <div className="flex flex-col gap-3 mb-6">
+                        <div className="flex justify-end">
+                            <button
+                                onClick={handleLogout}
+                                className="flex items-center gap-2 text-slate-500 dark:text-slate-400 hover:text-red-500 dark:hover:text-red-400 transition-colors text-sm font-semibold"
+                            >
+                                <LogOut size={16} /> Salir
+                            </button>
+                        </div>
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                            <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2 m-0 md:pt-1">
+                                <Clock className="text-blue-500" size={20} />
+                                Solicitudes Recientes
+                                <span className="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-white text-xs px-2 py-0.5 rounded-full">{recentAppointments.length}</span>
+                            </h2>
+                            <div className="flex flex-row flex-wrap items-center justify-end gap-2 md:gap-3">
+                                <input
+                                    type="text"
+                                    placeholder="Buscar por nombre o teléfono"
+                                    value={searchTerm}
+                                    onChange={(e) => { setSearchTerm(e.target.value); setListPage(0); }}
+                                    className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm min-w-[220px] w-full md:w-auto"
+                                />
                                 <button
                                     onClick={fetchAppointments}
                                     className="px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-sm font-semibold"
@@ -545,9 +528,18 @@ export default function Dashboard() {
                                 >
                                     {showAllList ? 'Ocultar lista' : 'Ver todas'}
                                 </button>
+                                <button
+                                    onClick={() => setShowNewAppointmentModal(true)}
+                                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors shadow-lg shadow-blue-600/20"
+                                >
+                                    <Plus size={18} />
+                                    Nueva Cita
+                                </button>
                             </div>
                         </div>
                     </div>
+
+
 
                     {recentAppointments.length === 0 ? (
                         <div className="text-slate-500 text-sm italic">No hay solicitudes registradas.</div>
