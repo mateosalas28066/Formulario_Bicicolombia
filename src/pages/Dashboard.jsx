@@ -165,7 +165,7 @@ export default function Dashboard() {
 
         if (!error) {
             // Trigger n8n Webhook
-            const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL;
+            const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL || (typeof window !== 'undefined' && window.BICICOLOMBIA_WEBHOOK_URL);
             if (webhookUrl) {
                 fetch(webhookUrl, {
                     method: 'POST',

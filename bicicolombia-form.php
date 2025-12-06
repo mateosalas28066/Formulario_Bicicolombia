@@ -8,7 +8,12 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-function bicicolombia_form_enqueue() {
+function bicicolombia_form_enqueue_assets() {
+    static $assets_enqueued = false;
+    if ( $assets_enqueued ) {
+        return;
+    }
+
     $plugin_dir_path = plugin_dir_path( __FILE__ );
     $plugin_dir_url = plugin_dir_url( __FILE__ );
     $dist_dir = $plugin_dir_path . 'dist/assets/';
@@ -42,8 +47,22 @@ function bicicolombia_form_enqueue() {
             '1.7' 
         );
     }
+
+    $assets_enqueued = true;
 }
-add_action( 'wp_enqueue_scripts', 'bicicolombia_form_enqueue' );
+
+function bicicolombia_form_maybe_enqueue() {
+    if ( is_admin() ) {
+        return;
+    }
+
+    global $post;
+
+    if ( $post instanceof WP_Post && has_shortcode( $post->post_content, 'bicicolombia_form' ) ) {
+        bicicolombia_form_enqueue_assets();
+    }
+}
+add_action( 'wp_enqueue_scripts', 'bicicolombia_form_maybe_enqueue' );
 
 // Add type="module"
 function bicicolombia_add_type_attr($tag, $handle, $src) {
@@ -56,6 +75,7 @@ add_filter('script_loader_tag', 'bicicolombia_add_type_attr', 10, 3);
 
 // Shortcode
 function bicicolombia_form_shortcode() {
-    return '<div id="root"></div>';
+    bicicolombia_form_enqueue_assets();
+    return '<div id="bicicolombia-form-root"></div>';
 }
 add_shortcode( 'bicicolombia_form', 'bicicolombia_form_shortcode' );

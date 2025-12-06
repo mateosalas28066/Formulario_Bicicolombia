@@ -47,36 +47,36 @@ for (let hour = 9; hour < 19; hour++) {
 }
 TIME_SLOTS.push("19:00");
 
+const getInitialFormData = () => {
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('en-CA');
+    let defaultTime = "09:00";
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+
+    for (let slot of TIME_SLOTS) {
+        const [h, m] = slot.split(':').map(Number);
+        if (h > currentHour || (h === currentHour && m > currentMinute)) {
+            defaultTime = slot;
+            break;
+        }
+    }
+
+    return {
+        date: dateStr,
+        time: defaultTime,
+        name: '',
+        phone: '',
+        email: '',
+        bikeType: 'MTB',
+        comments: ''
+    };
+};
+
 export default function BiciAgenda() {
     const [step, setStep] = useState(1);
     const [selectedServices, setSelectedServices] = useState([]);
-    const [formData, setFormData] = useState(() => {
-        const now = new Date();
-        const dateStr = now.toLocaleDateString('en-CA');
-        // Default to next available slot or 09:00 if late
-        let defaultTime = "09:00";
-        const currentHour = now.getHours();
-        const currentMinute = now.getMinutes();
-
-        // Simple logic to find next slot
-        for (let slot of TIME_SLOTS) {
-            const [h, m] = slot.split(':').map(Number);
-            if (h > currentHour || (h === currentHour && m > currentMinute)) {
-                defaultTime = slot;
-                break;
-            }
-        }
-
-        return {
-            date: dateStr,
-            time: defaultTime,
-            name: '',
-            phone: '',
-            email: '',
-            bikeType: 'MTB',
-            comments: ''
-        };
-    });
+    const [formData, setFormData] = useState(getInitialFormData);
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -139,6 +139,8 @@ export default function BiciAgenda() {
         e.preventDefault();
 
         try {
+            const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL || (typeof window !== 'undefined' && window.BICICOLOMBIA_WEBHOOK_URL);
+
             const { error } = await supabase
                 .from('citas')
                 .insert([
@@ -160,7 +162,6 @@ export default function BiciAgenda() {
             if (error) throw error;
 
             // Trigger n8n Webhook
-            const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL;
             console.log('Attempting to send webhook to:', webhookUrl);
 
             if (webhookUrl) {
@@ -199,6 +200,12 @@ export default function BiciAgenda() {
             console.error('Error saving appointment:', error);
             alert('Hubo un error al agendar la cita. Por favor intenta nuevamente.');
         }
+    };
+
+    const handleReset = () => {
+        setSelectedServices([]);
+        setFormData(getInitialFormData());
+        setStep(1);
     };
 
     const generateCalendarLink = () => {
@@ -450,6 +457,58 @@ export default function BiciAgenda() {
                                             <CheckCircle size={20} />
                                         </button>
                                     </form>
+                                </div>
+                            </div>
+                        )}
+
+                        {step === 3 && (
+                            <div className="animate-fade-in">
+                                <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-800 p-6 md:p-10 transition-colors duration-300">
+                                    <div className="flex items-center gap-3 mb-6">
+                                        <CheckCircle size={28} className="text-emerald-500" />
+                                        <div>
+                                            <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider">Cita agendada</p>
+                                            <h2 className="text-2xl font-bold text-slate-900 dark:text-white">¡Gracias por confiar en nosotros!</h2>
+                                        </div>
+                                    </div>
+
+                                    <p className="text-slate-600 dark:text-slate-300 mb-6">
+                                        Te esperamos el <span className="font-semibold text-slate-900 dark:text-white">{formData.date}</span> a las <span className="font-semibold text-slate-900 dark:text-white">{formData.time}</span>. Revisa tu teléfono para futuras confirmaciones.
+                                    </p>
+
+                                    <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg p-4 mb-6">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <div className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-200">
+                                                <Wrench size={16} className="text-blue-500" />
+                                                Servicios reservados ({selectedServices.length})
+                                            </div>
+                                            <span className="text-emerald-600 dark:text-emerald-400 font-bold">{formatPrice(getTotalPrice())}</span>
+                                        </div>
+                                        <ul className="space-y-1 text-sm text-slate-600 dark:text-slate-300">
+                                            {selectedServices.map(s => (
+                                                <li key={s.id} className="list-disc list-inside">{s.name}</li>
+                                            ))}
+                                        </ul>
+                                    </div>
+
+                                    <div className="flex flex-col md:flex-row gap-3">
+                                        <a
+                                            href={generateCalendarLink()}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="flex-1 inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 px-4 rounded-lg shadow-lg shadow-emerald-500/20 transition-all text-center"
+                                        >
+                                            <Calendar size={18} />
+                                            Agregar a Google Calendar
+                                        </a>
+                                        <button
+                                            onClick={handleReset}
+                                            className="flex-1 inline-flex items-center justify-center gap-2 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 font-bold py-3 px-4 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                                        >
+                                            <ChevronRight size={18} />
+                                            Agendar otra cita
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         )}
