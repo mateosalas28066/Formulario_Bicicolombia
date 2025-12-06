@@ -140,6 +140,16 @@ export default function BiciAgenda() {
 
         try {
             const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL || (typeof window !== 'undefined' && window.BICICOLOMBIA_WEBHOOK_URL);
+            const startDate = new Date(`${formData.date}T${formData.time}`);
+            const deliveryDate = new Date(startDate);
+            if (isAllExpress()) {
+                deliveryDate.setHours(19, 0, 0, 0);
+            } else {
+                deliveryDate.setDate(deliveryDate.getDate() + 1);
+                deliveryDate.setHours(19, 0, 0, 0);
+            }
+            const deliveryDateStr = deliveryDate.toLocaleDateString('en-CA');
+            const deliveryTimeStr = deliveryDate.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 
             const { error } = await supabase
                 .from('citas')
@@ -154,6 +164,8 @@ export default function BiciAgenda() {
                         service_price: getTotalPrice(),
                         appointment_date: formData.date,
                         appointment_time: formData.time,
+                        delivery_date: deliveryDateStr,
+                        delivery_time: deliveryTimeStr,
                         notes: formData.comments,
                         status: 'pending'
                     }

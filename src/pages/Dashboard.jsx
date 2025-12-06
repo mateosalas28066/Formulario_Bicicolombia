@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useNavigate } from 'react-router-dom';
 import { Calendar as BigCalendar, dateFnsLocalizer } from 'react-big-calendar';
@@ -26,6 +26,13 @@ const localizer = dateFnsLocalizer({
     locales,
 });
 
+const SERVICE_EXPRESS_MAP = SERVICE_DATA.reduce((acc, category) => {
+    category.items.forEach(item => {
+        acc[item.id] = item.express;
+    });
+    return acc;
+}, {});
+
 export default function Dashboard() {
     const [appointments, setAppointments] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -38,10 +45,15 @@ export default function Dashboard() {
     const [listPage, setListPage] = useState(0);
     const [detailModal, setDetailModal] = useState(null); // appointment
     const [detailAdminNote, setDetailAdminNote] = useState('');
+    const [notificationModal, setNotificationModal] = useState(null); // { type, app }
+    const recentListRef = useRef(null);
 
     // Reschedule state
     const [newDate, setNewDate] = useState('');
     const [newTime, setNewTime] = useState('');
+    const [newDeliveryDate, setNewDeliveryDate] = useState('');
+    const [newDeliveryTime, setNewDeliveryTime] = useState('');
+    const [autoDelivery, setAutoDelivery] = useState(true);
 
     // New Appointment State
     const [newApp, setNewApp] = useState(() => {
@@ -60,7 +72,7 @@ export default function Dashboard() {
     });
 
     // Calendar state
-    const [view, setView] = useState('month');
+    const [view, setView] = useState('week');
     const [date, setDate] = useState(new Date());
     const monthOptions = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
@@ -88,6 +100,44 @@ export default function Dashboard() {
 
         if (data) setAppointments(data);
         setLoading(false);
+        // Llevar el slider al inicio para mostrar la mбs reciente
+        requestAnimationFrame(() => {
+            if (recentListRef.current) {
+                recentListRef.current.scrollTo({ left: 0, behavior: 'smooth' });
+            }
+        });
+    };
+
+    const getServiceIdsFromApp = (app) => {
+        return (app?.service_id || '').split(',').map(id => id.trim()).filter(Boolean);
+    };
+
+    const calculateDelivery = (startDate, serviceIds = []) => {
+        const allExpress = serviceIds.length > 0 && serviceIds.every(id => SERVICE_EXPRESS_MAP[id]);
+        const delivery = new Date(startDate);
+        if (allExpress) {
+            delivery.setHours(19, 0, 0, 0);
+        } else {
+            delivery.setDate(delivery.getDate() + 1);
+            delivery.setHours(19, 0, 0, 0);
+        }
+        return {
+            date: delivery.toLocaleDateString('en-CA'),
+            time: delivery.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+            dateObj: delivery
+        };
+    };
+
+    const recalcDeliveryFromState = (dateVal, timeVal) => {
+        if (!showRescheduleModal) return;
+        const baseApp = showRescheduleModal.app || appointments.find(a => a.id === showRescheduleModal.id);
+        const serviceIds = getServiceIdsFromApp(baseApp);
+        const safeDate = dateVal || newDate;
+        const safeTime = timeVal || newTime;
+        if (!safeDate || !safeTime) return;
+        const result = calculateDelivery(new Date(`${safeDate}T${safeTime}`), serviceIds);
+        setNewDeliveryDate(result.date);
+        setNewDeliveryTime(result.time);
     };
 
     const sendWebhook = (app) => {
@@ -102,6 +152,8 @@ export default function Dashboard() {
             service_price: app.service_price,
             appointment_date: app.appointment_date,
             appointment_time: app.appointment_time,
+            delivery_date: app.delivery_date,
+            delivery_time: app.delivery_time,
             notes: app.notes,
             created_at: new Date().toISOString()
         };
@@ -132,21 +184,26 @@ export default function Dashboard() {
     };
 
     const buildWhatsappLink = (app, type = 'info') => {
-        const phone = (app?.client_phone || '').replace(/\\D/g, '');
-        if (!phone) return '#';
+        const rawPhone = (app?.client_phone || '').replace(/\D/g, '');
+        if (!rawPhone) return '#';
+        const phone = rawPhone.startsWith('57') ? rawPhone : rawPhone.length === 10 ? `57${rawPhone}` : rawPhone;
         const services = app?.service_name || 'Servicio';
         const date = app?.appointment_date || '';
         const time = app?.appointment_time || '';
+        const deliveryLine = app?.delivery_date && app?.delivery_time
+            ? ` Entrega estimada: ${app.delivery_date} a las ${app.delivery_time}.`
+            : '';
         let message = '';
         if (type === 'confirm') {
-            message = `Hola ${app?.client_name || ''}, confirmamos tu cita el ${date} a las ${time} para ${services}. Te esperamos.`;
+            message = `Hola ${app?.client_name || ''}, confirmamos tu cita el ${date} a las ${time} para ${services}.${deliveryLine} Te esperamos.`;
         } else if (type === 'reschedule') {
-            message = `Hola ${app?.client_name || ''}, reprogramamos tu cita para el ${date} a las ${time} para ${services}. Por favor confírmanos.`;
+            message = `Hola ${app?.client_name || ''}, actualizamos tu cita para el ${date} a las ${time} para ${services}.${deliveryLine} Aceptas este nuevo horario?`;
         } else {
-            message = `Hola ${app?.client_name || ''}, tu cita es el ${date} a las ${time} para ${services}.`;
+            message = `Hola ${app?.client_name || ''}, tu cita es el ${date} a las ${time} para ${services}.${deliveryLine}`;
         }
         return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
     };
+
 
     const handleLogout = async () => {
         await supabase.auth.signOut();
@@ -164,7 +221,13 @@ export default function Dashboard() {
             setShowConfirmModal(null);
             if (newStatus === 'confirmed') {
                 const app = appointments.find(a => a.id === id);
-                if (app) sendWebhook(app);
+                if (app) {
+                    const needsDelivery = !app.delivery_date || !app.delivery_time;
+                    const delivery = needsDelivery ? calculateDelivery(new Date(`${app.appointment_date}T${app.appointment_time}`), getServiceIdsFromApp(app)) : null;
+                    const appWithDelivery = needsDelivery ? { ...app, delivery_date: delivery.date, delivery_time: delivery.time } : app;
+                    sendWebhook(appWithDelivery);
+                    setNotificationModal({ type: 'confirm', app: appWithDelivery });
+                }
             }
         }
     };
@@ -173,11 +236,20 @@ export default function Dashboard() {
         e.preventDefault();
         if (!showRescheduleModal || !newDate || !newTime) return;
 
+        const sourceApp = showRescheduleModal.app || appointments.find(a => a.id === showRescheduleModal.id);
+        const startDate = new Date(`${newDate}T${newTime}`);
+        const serviceIds = getServiceIdsFromApp(sourceApp);
+        const computedDelivery = calculateDelivery(startDate, serviceIds);
+        const deliveryDateVal = autoDelivery ? computedDelivery.date : newDeliveryDate;
+        const deliveryTimeVal = autoDelivery ? computedDelivery.time : newDeliveryTime;
+
         const { error } = await supabase
             .from('citas')
             .update({
                 appointment_date: newDate,
                 appointment_time: newTime,
+                delivery_date: deliveryDateVal,
+                delivery_time: deliveryTimeVal,
                 status: 'pending'
             })
             .eq('id', showRescheduleModal.id);
@@ -188,13 +260,28 @@ export default function Dashboard() {
                 sendWebhook({
                     ...updatedApp,
                     appointment_date: newDate,
-                    appointment_time: newTime
+                    appointment_time: newTime,
+                    delivery_date: deliveryDateVal,
+                    delivery_time: deliveryTimeVal
                 });
             }
             fetchAppointments();
+            setNotificationModal({
+                type: 'reschedule',
+                app: {
+                    ...(sourceApp || {}),
+                    appointment_date: newDate,
+                    appointment_time: newTime,
+                    delivery_date: deliveryDateVal,
+                    delivery_time: deliveryTimeVal
+                }
+            });
             setShowRescheduleModal(null);
             setNewDate('');
             setNewTime('');
+            setNewDeliveryDate('');
+            setNewDeliveryTime('');
+            setAutoDelivery(true);
         }
     };
 
@@ -220,6 +307,7 @@ export default function Dashboard() {
         const serviceNames = newApp.selectedServices.map(s => s.name).join(' + ');
         const serviceIds = newApp.selectedServices.map(s => s.id).join(',');
         const totalPrice = newApp.selectedServices.reduce((sum, s) => sum + s.price, 0);
+        const deliveryEstimate = calculateDelivery(new Date(`${newApp.date}T${newApp.time}`), newApp.selectedServices.map(s => s.id));
 
         const { error } = await supabase
             .from('citas')
@@ -234,6 +322,8 @@ export default function Dashboard() {
                     service_price: totalPrice,
                     appointment_date: newApp.date,
                     appointment_time: newApp.time,
+                    delivery_date: deliveryEstimate.date,
+                    delivery_time: deliveryEstimate.time,
                     notes: newApp.comments,
                     status: 'confirmed' // Walk-ins are automatically confirmed
                 }
@@ -248,6 +338,8 @@ export default function Dashboard() {
                 service_price: totalPrice,
                 appointment_date: newApp.date,
                 appointment_time: newApp.time,
+                delivery_date: deliveryEstimate.date,
+                delivery_time: deliveryEstimate.time,
                 notes: newApp.comments
             });
             // Trigger n8n Webhook
@@ -298,34 +390,6 @@ export default function Dashboard() {
             const start = new Date(`${app.appointment_date}T${app.appointment_time}`);
             const serviceNames = (app.service_name || '').split(' + ');
 
-            // Heuristic to count Express vs Normal services
-            let expressCount = 0;
-            let normalCount = 0;
-
-            serviceNames.forEach(name => {
-                const lowerName = name.toLowerCase();
-                const isExpress =
-                    lowerName.includes('despinchada') ||
-                    lowerName.includes('cambio de rin') ||
-                    lowerName.includes('cobalada') ||
-                    lowerName.includes('purgada') ||
-                    lowerName.includes('cambio pastillas') ||
-                    lowerName.includes('cambio de borradores') ||
-                    lowerName.includes('calibrada') ||
-                    lowerName.includes('cambio/alineación') ||
-                    lowerName.includes('cambio de pacha') ||
-                    lowerName.includes('engrase de centro') ||
-                    lowerName.includes('engrase caja de dirección') ||
-                    lowerName.includes('alistamiento');
-
-                if (isExpress) {
-                    expressCount++;
-                } else {
-                    normalCount++;
-                }
-            });
-
-            // Entry Event (Green)
             const entryEvent = {
                 title: `Entrada: ${capitalizeName(app.client_name)}`,
                 start,
@@ -335,20 +399,9 @@ export default function Dashboard() {
                 details: `${serviceNames.length} servicios: ${app.service_name}`
             };
 
-            // Exit Event (Purple) logic
-            let exitDate = new Date(start);
-            const isMorning = start.getHours() < 12;
-
-            if (normalCount === 0 && expressCount > 0 && expressCount <= 2 && isMorning) {
-                // Express Exception
-                exitDate.setHours(19, 0, 0, 0);
-            } else if (normalCount > 4) {
-                // Volume Exception
-                exitDate.setDate(exitDate.getDate() + 2);
-            } else {
-                // Default / Mixed / Many Express
-                exitDate.setDate(exitDate.getDate() + 1);
-            }
+            const exitDate = (app.delivery_date && app.delivery_time)
+                ? new Date(`${app.delivery_date}T${app.delivery_time}`)
+                : calculateDelivery(start, getServiceIdsFromApp(app)).dateObj;
 
             const exitEvent = {
                 title: `Entrega: ${capitalizeName(app.client_name)}`,
@@ -361,6 +414,7 @@ export default function Dashboard() {
 
             return [entryEvent, exitEvent];
         });
+
 
     if (loading) return <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center text-slate-900 dark:text-white transition-colors duration-300">Cargando...</div>;
 
@@ -498,9 +552,9 @@ export default function Dashboard() {
                     {recentAppointments.length === 0 ? (
                         <div className="text-slate-500 text-sm italic">No hay solicitudes registradas.</div>
                     ) : (
-                        <div className="flex gap-6 overflow-x-auto pb-6 custom-scrollbar snap-x">
+                        <div className="flex gap-6 overflow-x-auto pb-6 custom-scrollbar snap-x" ref={recentListRef}>
                             {recentAppointments.map((app) => (
-                                <div key={app.id} className={`min-w-[340px] rounded-xl p-6 border shadow-lg relative group transition-all snap-start flex-shrink-0 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700`}>
+                                <div key={app.id} className={`min-w-[340px] rounded-xl p-6 border shadow-lg relative group transition-all snap-start flex-shrink-0 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 flex flex-col min-h-[220px]`}>
                                     <div className="flex justify-between items-start mb-4">
                                         <div>
                                             <h3 className="font-bold text-slate-900 dark:text-white truncate w-48 capitalize text-lg" title={app.client_name}>{capitalizeName(app.client_name)}</h3>
@@ -517,8 +571,14 @@ export default function Dashboard() {
                                         </span>
                                     </div>
 
-                                    <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-lg mb-4 text-sm border border-slate-200 dark:border-slate-800/50 transition-colors duration-300">
-                                        <p className="text-slate-700 dark:text-slate-300 font-medium truncate" title={app.service_name}>{app.service_name}</p>
+                                    <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-lg mb-4 text-sm border border-slate-200 dark:border-slate-800/50 transition-colors duration-300 min-h-[78px]">
+                                        <p
+                                            className="text-slate-700 dark:text-slate-300 font-medium leading-snug"
+                                            title={app.service_name}
+                                            style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+                                        >
+                                            {app.service_name}
+                                        </p>
                                         <div className="flex justify-between mt-2 text-xs text-slate-500 font-medium">
                                             <span>{app.appointment_date}</span>
                                             <span>{app.appointment_time}</span>
@@ -526,7 +586,7 @@ export default function Dashboard() {
                                     </div>
 
                                     {/* Actions with Ghost Icons */}
-                                    <div className="flex items-center gap-3 mt-2">
+                                    <div className="flex items-center gap-3 mt-auto pt-2">
                                         {app.status !== 'cancelled' && (
                                             <>
                                                 {app.status === 'pending' && (
@@ -540,9 +600,16 @@ export default function Dashboard() {
                                                 )}
                                                 <button
                                                     onClick={() => {
-                                                        setShowRescheduleModal({ id: app.id });
+                                                        const startDate = new Date(`${app.appointment_date}T${app.appointment_time}`);
+                                                        const deliverySeed = (app.delivery_date && app.delivery_time)
+                                                            ? { date: app.delivery_date, time: app.delivery_time }
+                                                            : calculateDelivery(startDate, getServiceIdsFromApp(app));
+                                                        setShowRescheduleModal({ id: app.id, app });
                                                         setNewDate(app.appointment_date);
                                                         setNewTime(app.appointment_time);
+                                                        setNewDeliveryDate(deliverySeed.date);
+                                                        setNewDeliveryTime(deliverySeed.time);
+                                                        setAutoDelivery(true);
                                                     }}
                                                     className="p-2 text-slate-400 hover:text-blue-600 transition-colors"
                                                     title="Reprogramar"
@@ -604,7 +671,7 @@ export default function Dashboard() {
                             </div>
                             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {paginatedAppointments.map((app) => (
-                                    <div key={app.id} className="rounded-xl p-5 border shadow-sm bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
+                                    <div key={app.id} className="rounded-xl p-5 border shadow-sm bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 flex flex-col min-h-[200px]">
                                         <div className="flex justify-between items-start mb-3">
                                             <div>
                                                 <p className="font-bold text-slate-900 dark:text-white capitalize">{capitalizeName(app.client_name)}</p>
@@ -620,11 +687,17 @@ export default function Dashboard() {
                                                         app.status === 'completed' ? 'Entregada' : 'Cancelada'}
                                             </span>
                                         </div>
-                                        <div className="text-xs text-slate-600 dark:text-slate-300 space-y-1 mb-3">
-                                            <p>{app.service_name}</p>
+                                        <div className="text-xs text-slate-600 dark:text-slate-300 space-y-1 mb-3 min-h-[64px]">
+                                            <p
+                                                className="leading-snug"
+                                                title={app.service_name}
+                                                style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+                                            >
+                                                {app.service_name}
+                                            </p>
                                             <p>{app.appointment_date} {app.appointment_time}</p>
                                         </div>
-                                        <div className="flex flex-wrap gap-2 text-xs">
+                                        <div className="flex flex-wrap gap-2 text-xs mt-auto">
                                             <button
                                                 onClick={() => openDetail(app)}
                                                 className="px-2 py-1 rounded border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 flex items-center gap-1"
@@ -725,6 +798,7 @@ export default function Dashboard() {
                                 culture='es'
                                 view={view}
                                 onView={setView}
+                                views={['week', 'day']}
                                 date={date}
                                 onNavigate={setDate}
                                 min={new Date(0, 0, 0, 8, 0, 0)} // 8 AM
@@ -784,6 +858,7 @@ export default function Dashboard() {
                                 <p><span className="font-semibold">Bicicleta:</span> {detailModal.bike_type}</p>
                                 <p><span className="font-semibold">Fecha:</span> {detailModal.appointment_date}</p>
                                 <p><span className="font-semibold">Hora:</span> {detailModal.appointment_time}</p>
+                                <p><span className="font-semibold">Entrega estimada:</span> {detailModal.delivery_date || 'Pendiente'} {detailModal.delivery_time || ''}</p>
                             </div>
                             <div className="space-y-1">
                                 <p><span className="font-semibold">Servicios:</span></p>
@@ -1011,7 +1086,12 @@ export default function Dashboard() {
                                     type="date"
                                     min={new Date().toISOString().split('T')[0]}
                                     value={newDate}
-                                    onChange={(e) => setNewDate(e.target.value)}
+                                    onChange={(e) => {
+                                        setNewDate(e.target.value);
+                                        if (autoDelivery) {
+                                            recalcDeliveryFromState(e.target.value, newTime);
+                                        }
+                                    }}
                                     className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                                 />
                             </div>
@@ -1023,10 +1103,66 @@ export default function Dashboard() {
                                     min="09:00"
                                     max="19:00"
                                     value={newTime}
-                                    onChange={(e) => setNewTime(e.target.value)}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        setNewTime(val);
+                                        if (autoDelivery) {
+                                            recalcDeliveryFromState(newDate, val);
+                                        }
+                                    }}
                                     className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                                 />
                                 <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">Horario: 9 a.m. a 7 p.m.</p>
+                            </div>
+                            <div className="pt-1 border-t border-slate-200 dark:border-slate-800">
+                                <div className="flex items-center justify-between mb-3">
+                                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Salida estimada</label>
+                                    <label className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                                        <input
+                                            type="checkbox"
+                                            checked={!autoDelivery}
+                                            onChange={(e) => {
+                                                const manual = e.target.checked;
+                                                setAutoDelivery(!manual);
+                                                if (!manual) {
+                                                    recalcDeliveryFromState(newDate, newTime);
+                                                }
+                                            }}
+                                        />
+                                        <span>Editar manualmente</span>
+                                    </label>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <input
+                                            type="date"
+                                            value={newDeliveryDate}
+                                            onChange={(e) => setNewDeliveryDate(e.target.value)}
+                                            disabled={autoDelivery}
+                                            className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all disabled:opacity-60"
+                                        />
+                                    </div>
+                                    <div>
+                                        <input
+                                            type="time"
+                                            value={newDeliveryTime}
+                                            onChange={(e) => setNewDeliveryTime(e.target.value)}
+                                            disabled={autoDelivery}
+                                            className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all disabled:opacity-60"
+                                        />
+                                    </div>
+                                </div>
+                                {autoDelivery ? (
+                                    <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">Se calcula automaticamente segun servicios (Express mismo dia 7 p.m., de lo contrario +1 dia 7 p.m.).</p>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        onClick={() => { setAutoDelivery(true); recalcDeliveryFromState(newDate, newTime); }}
+                                        className="mt-2 text-xs font-semibold text-blue-600 hover:text-blue-500"
+                                    >
+                                        Volver a calculo automatico
+                                    </button>
+                                )}
                             </div>
                             <button
                                 type="submit"
@@ -1035,6 +1171,48 @@ export default function Dashboard() {
                                 Guardar Cambios
                             </button>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* NOTIFICATION MODAL AFTER CONFIRM/RESCHEDULE */}
+            {notificationModal && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
+                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-8 max-w-md w-full shadow-2xl animate-fade-in-up transition-colors duration-300">
+                        <div className="flex justify-between items-center mb-6">
+                            <div>
+                                <p className="text-[11px] uppercase font-bold text-emerald-600 dark:text-emerald-400 tracking-wider">{notificationModal.type === 'confirm' ? 'Cita confirmada' : 'Cita reprogramada'}</p>
+                                <h3 className="text-2xl font-bold text-slate-900 dark:text-white">Avisar por WhatsApp</h3>
+                            </div>
+                            <button onClick={() => setNotificationModal(null)} className="text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors">
+                                <X size={22} />
+                            </button>
+                        </div>
+                        <div className="space-y-2 text-sm text-slate-700 dark:text-slate-300 mb-6">
+                            <p><span className="font-semibold">Cliente:</span> {notificationModal.app?.client_name}</p>
+                            <p><span className="font-semibold">Entrada:</span> {notificationModal.app?.appointment_date} {notificationModal.app?.appointment_time}</p>
+                            {notificationModal.app?.delivery_date && notificationModal.app?.delivery_time && (
+                                <p><span className="font-semibold">Salida estimada:</span> {notificationModal.app.delivery_date} {notificationModal.app.delivery_time}</p>
+                            )}
+                            <p><span className="font-semibold">Servicios:</span> {notificationModal.app?.service_name}</p>
+                        </div>
+                        <div className="flex flex-col sm:flex-row gap-3">
+                            <a
+                                href={buildWhatsappLink(notificationModal.app, notificationModal.type === 'reschedule' ? 'reschedule' : 'confirm')}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="flex-1 inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 px-4 rounded-lg shadow-lg shadow-emerald-500/20 transition-all text-center"
+                            >
+                                <MessageCircle size={18} />
+                                Avisar por WhatsApp
+                            </a>
+                            <button
+                                onClick={() => setNotificationModal(null)}
+                                className="flex-1 inline-flex items-center justify-center gap-2 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 font-bold py-3 px-4 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                            >
+                                Cerrar
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
