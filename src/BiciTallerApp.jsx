@@ -161,40 +161,6 @@ export default function BiciAgenda() {
 
             if (error) throw error;
 
-            // Trigger n8n Webhook
-            console.log('Attempting to send webhook to:', webhookUrl);
-
-            if (webhookUrl) {
-                const payload = {
-                    client_name: formData.name,
-                    client_phone: formData.phone,
-                    bike_type: formData.bikeType,
-                    service_name: getServiceNames(),
-                    service_price: getTotalPrice(),
-                    appointment_date: formData.date,
-                    appointment_time: formData.time,
-                    notes: formData.comments,
-                    created_at: new Date().toISOString()
-                };
-                console.log('Webhook Payload:', payload);
-
-                fetch(webhookUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(payload)
-                })
-                    .then(response => {
-                        console.log('Webhook Response Status:', response.status);
-                        return response.text();
-                    })
-                    .then(data => console.log('Webhook Response Data:', data))
-                    .catch(err => console.error('Webhook Error:', err));
-            } else {
-                console.warn('No VITE_N8N_WEBHOOK_URL defined in .env');
-            }
-
             setStep(3);
         } catch (error) {
             console.error('Error saving appointment:', error);

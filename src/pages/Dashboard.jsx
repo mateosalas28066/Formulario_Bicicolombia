@@ -10,7 +10,7 @@ import es from 'date-fns/locale/es';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import {
     Calendar, Clock, CheckCircle, XCircle, RefreshCw, LogOut, Phone,
-    AlertTriangle, X, Plus, Wrench, Edit, Trash2, Check, ChevronRight
+    AlertTriangle, X, Plus, Wrench, Edit, Trash2, Check, ChevronRight, Eye, MessageCircle, ChevronLeft
 } from 'lucide-react';
 import { SERVICE_DATA } from '../data/services';
 
@@ -33,6 +33,11 @@ export default function Dashboard() {
     const [showRescheduleModal, setShowRescheduleModal] = useState(null); // { id: string }
     const [showNewAppointmentModal, setShowNewAppointmentModal] = useState(false);
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [showAllList, setShowAllList] = useState(false);
+    const [listPage, setListPage] = useState(0);
+    const [detailModal, setDetailModal] = useState(null); // appointment
+    const [detailAdminNote, setDetailAdminNote] = useState('');
 
     // Reschedule state
     const [newDate, setNewDate] = useState('');
@@ -57,6 +62,7 @@ export default function Dashboard() {
     // Calendar state
     const [view, setView] = useState('month');
     const [date, setDate] = useState(new Date());
+    const monthOptions = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
     const navigate = useNavigate();
 
@@ -84,6 +90,64 @@ export default function Dashboard() {
         setLoading(false);
     };
 
+    const sendWebhook = (app) => {
+        const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL || (typeof window !== 'undefined' && window.BICICOLOMBIA_WEBHOOK_URL);
+        if (!webhookUrl || !app) return;
+
+        const payload = {
+            client_name: app.client_name,
+            client_phone: app.client_phone,
+            bike_type: app.bike_type,
+            service_name: app.service_name,
+            service_price: app.service_price,
+            appointment_date: app.appointment_date,
+            appointment_time: app.appointment_time,
+            notes: app.notes,
+            created_at: new Date().toISOString()
+        };
+
+        fetch(webhookUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        }).catch(err => console.error('Webhook Error:', err));
+    };
+
+    const openDetail = (app) => {
+        setDetailModal(app);
+        setDetailAdminNote(app?.admin_note || '');
+    };
+
+    const saveAdminNote = async () => {
+        if (!detailModal) return;
+        const { error } = await supabase
+            .from('citas')
+            .update({ admin_note: detailAdminNote })
+            .eq('id', detailModal.id);
+        if (!error) {
+            fetchAppointments();
+        } else {
+            alert('No se pudo guardar la nota interna. Verifica que la columna admin_note exista en la tabla.');
+        }
+    };
+
+    const buildWhatsappLink = (app, type = 'info') => {
+        const phone = (app?.client_phone || '').replace(/\\D/g, '');
+        if (!phone) return '#';
+        const services = app?.service_name || 'Servicio';
+        const date = app?.appointment_date || '';
+        const time = app?.appointment_time || '';
+        let message = '';
+        if (type === 'confirm') {
+            message = `Hola ${app?.client_name || ''}, confirmamos tu cita el ${date} a las ${time} para ${services}. Te esperamos.`;
+        } else if (type === 'reschedule') {
+            message = `Hola ${app?.client_name || ''}, reprogramamos tu cita para el ${date} a las ${time} para ${services}. Por favor confírmanos.`;
+        } else {
+            message = `Hola ${app?.client_name || ''}, tu cita es el ${date} a las ${time} para ${services}.`;
+        }
+        return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+    };
+
     const handleLogout = async () => {
         await supabase.auth.signOut();
         navigate('/login');
@@ -98,6 +162,10 @@ export default function Dashboard() {
         if (!error) {
             fetchAppointments();
             setShowConfirmModal(null);
+            if (newStatus === 'confirmed') {
+                const app = appointments.find(a => a.id === id);
+                if (app) sendWebhook(app);
+            }
         }
     };
 
@@ -115,6 +183,14 @@ export default function Dashboard() {
             .eq('id', showRescheduleModal.id);
 
         if (!error) {
+            const updatedApp = appointments.find(a => a.id === showRescheduleModal.id);
+            if (updatedApp) {
+                sendWebhook({
+                    ...updatedApp,
+                    appointment_date: newDate,
+                    appointment_time: newTime
+                });
+            }
             fetchAppointments();
             setShowRescheduleModal(null);
             setNewDate('');
@@ -164,28 +240,17 @@ export default function Dashboard() {
             ]);
 
         if (!error) {
+            sendWebhook({
+                client_name: newApp.name,
+                client_phone: newApp.phone,
+                bike_type: newApp.bikeType,
+                service_name: serviceNames,
+                service_price: totalPrice,
+                appointment_date: newApp.date,
+                appointment_time: newApp.time,
+                notes: newApp.comments
+            });
             // Trigger n8n Webhook
-            const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL || (typeof window !== 'undefined' && window.BICICOLOMBIA_WEBHOOK_URL);
-            if (webhookUrl) {
-                fetch(webhookUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        client_name: newApp.name,
-                        client_phone: newApp.phone,
-                        bike_type: newApp.bikeType,
-                        service_name: serviceNames,
-                        service_price: totalPrice,
-                        appointment_date: newApp.date,
-                        appointment_time: newApp.time,
-                        notes: newApp.comments,
-                        created_at: new Date().toISOString()
-                    })
-                }).catch(err => console.error('Webhook Error:', err));
-            }
-
             fetchAppointments();
             setShowNewAppointmentModal(false);
             setNewApp(prev => {
@@ -213,7 +278,18 @@ export default function Dashboard() {
     };
 
     // Filter appointments
-    const recentAppointments = appointments;
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+    const filteredAppointments = normalizedSearch
+        ? appointments.filter(app =>
+            (app.client_name || '').toLowerCase().includes(normalizedSearch) ||
+            (app.client_phone || '').toLowerCase().includes(normalizedSearch)
+        )
+        : appointments;
+
+    const recentAppointments = filteredAppointments.slice(0, 25);
+    const pageSize = 25;
+    const totalPages = Math.max(1, Math.ceil(filteredAppointments.length / pageSize));
+    const paginatedAppointments = filteredAppointments.slice(listPage * pageSize, (listPage + 1) * pageSize);
 
     // Map confirmed appointments to calendar events (Entry and Exit)
     const events = appointments
@@ -388,11 +464,36 @@ export default function Dashboard() {
 
                 {/* --- TOP PANEL: RECENT REQUESTS (Horizontal Slider) --- */}
                 <div className="bg-white/50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-800 p-8 flex-shrink-0 backdrop-blur-sm transition-colors duration-300">
-                    <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
-                        <Clock className="text-blue-500" size={20} />
-                        Solicitudes Recientes
-                        <span className="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-white text-xs px-2 py-0.5 rounded-full">{recentAppointments.length}</span>
-                    </h2>
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+                        <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                            <Clock className="text-blue-500" size={20} />
+                            Solicitudes Recientes
+                            <span className="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-white text-xs px-2 py-0.5 rounded-full">{recentAppointments.length}</span>
+                        </h2>
+                        <div className="flex flex-col md:flex-row gap-2 md:items-center">
+                            <input
+                                type="text"
+                                placeholder="Buscar por nombre o teléfono"
+                                value={searchTerm}
+                                onChange={(e) => { setSearchTerm(e.target.value); setListPage(0); }}
+                                className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm"
+                            />
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={fetchAppointments}
+                                    className="px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-sm font-semibold"
+                                >
+                                    Actualizar
+                                </button>
+                                <button
+                                    onClick={() => setShowAllList(prev => !prev)}
+                                    className="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold"
+                                >
+                                    {showAllList ? 'Ocultar lista' : 'Ver todas'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
 
                     {recentAppointments.length === 0 ? (
                         <div className="text-slate-500 text-sm italic">No hay solicitudes registradas.</div>
@@ -434,7 +535,7 @@ export default function Dashboard() {
                                                         className="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20"
                                                         title="Aceptar Cita"
                                                     >
-                                                        <Check size={16} /> Confirmar
+                                                        <Check size={14} /> Confirmar
                                                     </button>
                                                 )}
                                                 <button
@@ -443,23 +544,105 @@ export default function Dashboard() {
                                                         setNewDate(app.appointment_date);
                                                         setNewTime(app.appointment_time);
                                                     }}
-                                                    className="w-10 h-10 rounded-full flex items-center justify-center transition-all text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white hover:scale-105 active:scale-95"
-                                                    title="Editar Cita"
+                                                    className="p-2 text-slate-400 hover:text-blue-600 transition-colors"
+                                                    title="Reprogramar"
                                                 >
-                                                    <Edit size={18} />
+                                                    <Edit size={16} />
                                                 </button>
                                                 <button
                                                     onClick={() => setShowConfirmModal({ type: 'cancel', id: app.id })}
-                                                    className="w-10 h-10 rounded-full flex items-center justify-center transition-all text-slate-400 hover:bg-red-100 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 hover:scale-105 active:scale-95"
-                                                    title="Cancelar Cita"
+                                                    className="p-2 text-slate-400 hover:text-red-500 transition-colors"
+                                                    title="Cancelar cita"
                                                 >
-                                                    <Trash2 size={18} />
+                                                    <Trash2 size={16} />
                                                 </button>
+                                                <button
+                                                    onClick={() => openDetail(app)}
+                                                    className="p-2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+                                                    title="Ver detalle"
+                                                >
+                                                    <Eye size={16} />
+                                                </button>
+                                                <a
+                                                    href={buildWhatsappLink(app, 'info')}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="p-2 text-slate-400 hover:text-green-600 transition-colors"
+                                                    title="Contactar por WhatsApp"
+                                                >
+                                                    <MessageCircle size={16} />
+                                                </a>
                                             </>
                                         )}
                                     </div>
                                 </div>
                             ))}
+                        </div>
+                    )}
+
+                    {showAllList && (
+                        <div className="mt-8 space-y-4">
+                            <div className="flex justify-between items-center">
+                                <h3 className="font-bold text-slate-900 dark:text-white text-sm">Listado completo</h3>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => setListPage(p => Math.max(0, p - 1))}
+                                        disabled={listPage === 0}
+                                        className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-50 flex items-center gap-1"
+                                    >
+                                        <ChevronLeft size={14} /> Anterior
+                                    </button>
+                                    <span className="text-xs text-slate-500 dark:text-slate-400">Página {listPage + 1} / {totalPages}</span>
+                                    <button
+                                        onClick={() => setListPage(p => Math.min(totalPages - 1, p + 1))}
+                                        disabled={listPage >= totalPages - 1}
+                                        className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 disabled:opacity-50 flex items-center gap-1"
+                                    >
+                                        Siguiente <ChevronRight size={14} />
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {paginatedAppointments.map((app) => (
+                                    <div key={app.id} className="rounded-xl p-5 border shadow-sm bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
+                                        <div className="flex justify-between items-start mb-3">
+                                            <div>
+                                                <p className="font-bold text-slate-900 dark:text-white capitalize">{capitalizeName(app.client_name)}</p>
+                                                <p className="text-xs text-slate-500 flex items-center gap-1"><Phone size={12} /> {app.client_phone}</p>
+                                            </div>
+                                            <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider ${app.status === 'pending' ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30' :
+                                                app.status === 'confirmed' ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-500/30' :
+                                                    app.status === 'completed' ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30' :
+                                                        'bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-500/30'
+                                            }`}>
+                                                {app.status === 'pending' ? 'Pendiente' :
+                                                    app.status === 'confirmed' ? 'Confirmada' :
+                                                        app.status === 'completed' ? 'Entregada' : 'Cancelada'}
+                                            </span>
+                                        </div>
+                                        <div className="text-xs text-slate-600 dark:text-slate-300 space-y-1 mb-3">
+                                            <p>{app.service_name}</p>
+                                            <p>{app.appointment_date} {app.appointment_time}</p>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2 text-xs">
+                                            <button
+                                                onClick={() => openDetail(app)}
+                                                className="px-2 py-1 rounded border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 flex items-center gap-1"
+                                            >
+                                                <Eye size={14} /> Detalle
+                                            </button>
+                                            <a
+                                                href={buildWhatsappLink(app, 'info')}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="px-2 py-1 rounded border border-slate-200 dark:border-slate-700 text-green-600 flex items-center gap-1"
+                                            >
+                                                <MessageCircle size={14} /> WhatsApp
+                                            </a>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     )}
                 </div>
@@ -505,6 +688,34 @@ export default function Dashboard() {
                     ) : (
                         // Desktop Calendar View
                         <div className="flex-1 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6 shadow-inner text-slate-700 dark:text-slate-300 transition-colors duration-300">
+                            <div className="flex flex-wrap items-center gap-3 mb-4">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs uppercase font-bold text-slate-500 dark:text-slate-400">Mes</span>
+                                    <div className="grid grid-cols-6 gap-1">
+                                        {monthOptions.map((m, idx) => (
+                                            <button
+                                                key={m}
+                                                onClick={() => setDate(new Date(date.getFullYear(), idx, 1))}
+                                                className={`px-2 py-1 text-xs rounded ${date.getMonth() === idx ? 'bg-blue-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
+                                            >
+                                                {m.slice(0, 3)}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs uppercase font-bold text-slate-500 dark:text-slate-400">Año</span>
+                                    <input
+                                        type="number"
+                                        value={date.getFullYear()}
+                                        onChange={(e) => {
+                                            const year = parseInt(e.target.value || `${new Date().getFullYear()}`, 10);
+                                            if (!isNaN(year)) setDate(new Date(year, date.getMonth(), 1));
+                                        }}
+                                        className="w-20 px-2 py-1 text-sm rounded border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900"
+                                    />
+                                </div>
+                            </div>
                             <BigCalendar
                                 localizer={localizer}
                                 events={events}
@@ -552,6 +763,81 @@ export default function Dashboard() {
             </main>
 
             {/* --- MODALS --- */}
+
+            {/* DETAIL MODAL */}
+            {detailModal && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-8 max-w-2xl w-full shadow-2xl animate-fade-in-up max-h-[90vh] overflow-y-auto custom-scrollbar transition-colors duration-300">
+                        <div className="flex justify-between items-center mb-6">
+                            <div>
+                                <p className="text-xs uppercase font-bold text-slate-500 dark:text-slate-400">Detalle de cita</p>
+                                <h3 className="text-2xl font-bold text-slate-900 dark:text-white capitalize">{capitalizeName(detailModal.client_name)}</h3>
+                            </div>
+                            <button onClick={() => setDetailModal(null)} className="text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors">
+                                <X size={24} />
+                            </button>
+                        </div>
+
+                        <div className="grid md:grid-cols-2 gap-4 mb-4 text-sm text-slate-700 dark:text-slate-300">
+                            <div className="space-y-1">
+                                <p><span className="font-semibold">Teléfono:</span> {detailModal.client_phone}</p>
+                                <p><span className="font-semibold">Bicicleta:</span> {detailModal.bike_type}</p>
+                                <p><span className="font-semibold">Fecha:</span> {detailModal.appointment_date}</p>
+                                <p><span className="font-semibold">Hora:</span> {detailModal.appointment_time}</p>
+                            </div>
+                            <div className="space-y-1">
+                                <p><span className="font-semibold">Servicios:</span></p>
+                                <p className="whitespace-pre-line text-slate-600 dark:text-slate-300">{detailModal.service_name}</p>
+                                <p><span className="font-semibold">Notas cliente:</span></p>
+                                <p className="whitespace-pre-line text-slate-600 dark:text-slate-300">{detailModal.notes || 'Sin notas'}</p>
+                            </div>
+                        </div>
+
+                        <div className="mb-4">
+                            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Nota interna</label>
+                            <textarea
+                                value={detailAdminNote}
+                                onChange={(e) => setDetailAdminNote(e.target.value)}
+                                rows="3"
+                                className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all resize-none"
+                            />
+                            <button
+                                onClick={saveAdminNote}
+                                className="mt-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold"
+                            >
+                                Guardar nota
+                            </button>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                            <a
+                                href={buildWhatsappLink(detailModal, 'info')}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-green-600 flex items-center gap-2"
+                            >
+                                <MessageCircle size={16} /> Contactar
+                            </a>
+                            <a
+                                href={buildWhatsappLink(detailModal, 'confirm')}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="px-3 py-2 rounded-lg border border-blue-200 dark:border-blue-700 text-blue-600 flex items-center gap-2"
+                            >
+                                <MessageCircle size={16} /> Confirmar por WhatsApp
+                            </a>
+                            <a
+                                href={buildWhatsappLink(detailModal, 'reschedule')}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="px-3 py-2 rounded-lg border border-amber-200 dark:border-amber-700 text-amber-600 flex items-center gap-2"
+                            >
+                                <MessageCircle size={16} /> Avisar reprogramación
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* NEW APPOINTMENT MODAL */}
             {showNewAppointmentModal && (
